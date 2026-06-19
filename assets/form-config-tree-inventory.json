@@ -1,0 +1,49 @@
+{
+  "formId": "tree-inventory-001",
+  "formTitle": "Tree Inventory",
+  "version": "1.0",
+  "fields": [
+    {
+      "id": "location",
+      "label": "GPS Location",
+      "type": "gps",
+      "auto": true,
+      "required": true
+    },
+    {
+      "id": "tree_id",
+      "label": "Tree ID / Tag",
+      "type": "text",
+      "required": true,
+      "placeholder": "e.g. T-0042"
+    },
+    {
+      "id": "species",
+      "label": "Species",
+      "type": "select",
+      "required": true,
+      "options": ["Oak", "Pine", "Olive", "Plane", "Palm", "Cypress", "Other"]
+    },
+    {
+      "id": "health",
+      "label": "Health Rating",
+      "type": "rating",
+      "max": 5,
+      "required": true
+    },
+    {
+      "id": "photo",
+      "label": "Photos",
+      "type": "image",
+      "multiple": true,
+      "required": false
+    },
+    {
+      "id": "notes",
+      "label": "Notes",
+      "type": "textarea",
+      "required": false,
+      "placeholder": "Observations, pruning needs, damage…"
+    }
+  ]
+}

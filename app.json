@@ -2,6 +2,7 @@
   "expo": {
     "name": "Collector",
     "slug": "Collector",
+    "scheme": "collector",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,6 +20,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sharing",
+      "expo-font",
+      "expo-splash-screen"
+    ]
   }
 }

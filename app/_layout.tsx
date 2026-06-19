@@ -1,0 +1,40 @@
+import { useEffect } from 'react';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import {
+  Roboto_400Regular,
+  Roboto_500Medium,
+  Roboto_700Bold,
+} from '@expo-google-fonts/roboto';
+import * as SplashScreen from 'expo-splash-screen';
+import { loadBundledConfig } from '../utils/schemaLoader';
+import { useFormStore } from '../store/formStore';
+
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const loadSchema = useFormStore((s) => s.loadSchema);
+
+  const [fontsLoaded] = useFonts({
+    Roboto_400Regular,
+    Roboto_500Medium,
+    Roboto_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      loadSchema(loadBundledConfig());
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
+
+  return (
+    <>
+      <StatusBar style="dark" />
+      <Stack screenOptions={{ headerShown: false }} />
+    </>
+  );
+}
