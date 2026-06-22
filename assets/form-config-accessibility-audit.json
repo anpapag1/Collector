@@ -1,0 +1,62 @@
+{
+  "formId": "accessibility-audit-001",
+  "formTitle": "Accessibility Audit",
+  "version": "1.0",
+  "fields": [
+    {
+      "id": "location",
+      "label": "GPS Location",
+      "type": "gps",
+      "auto": true,
+      "required": true
+    },
+    {
+      "id": "audit_id",
+      "label": "Audit ID",
+      "type": "text",
+      "required": true,
+      "placeholder": "e.g. AA-019"
+    },
+    {
+      "id": "site_name",
+      "label": "Site name",
+      "type": "text",
+      "required": true,
+      "placeholder": "e.g. Library entrance"
+    },
+    {
+      "id": "entrance_clear",
+      "label": "Entrance clear and accessible",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "id": "path_condition",
+      "label": "Path condition",
+      "type": "select",
+      "required": true,
+      "options": ["Good", "Minor issues", "Needs repair", "Blocked"]
+    },
+    {
+      "id": "accessibility_score",
+      "label": "Accessibility score",
+      "type": "rating",
+      "max": 5,
+      "required": true
+    },
+    {
+      "id": "photo",
+      "label": "Photos",
+      "type": "image",
+      "multiple": true,
+      "required": false
+    },
+    {
+      "id": "notes",
+      "label": "Notes",
+      "type": "textarea",
+      "required": false,
+      "placeholder": "Obstacles, ramps, signage, and other observations…"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import {
+  Alert,
   View,
   Text,
   ScrollView,
@@ -13,16 +14,31 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
+import CollectorLogo from '../assets/Collector_Logo.svg';
 import { useFormStore } from '../store/formStore';
 import { useEntriesStore } from '../store/entriesStore';
+import { usePickerStore } from '../store/pickerStore';
 import EntryCard from '../components/EntryCard';
+import { FormConfig } from '../types';
 import { timeAgo } from '../utils/timeUtils';
-import { loadFromPath } from '../utils/schemaLoader';
+import { loadBundledConfig, loadFromPath } from '../utils/schemaLoader';
 
-const PRESETS = [
-  { title: 'Site Survey — Municipality X', sub: '6 fields' },
-  { title: 'Tree Inventory', sub: '5 fields' },
-  { title: 'Accessibility Audit', sub: '8 fields' },
+type FormPreset = {
+  id: string;
+  config: FormConfig;
+  custom?: boolean;
+};
+
+const INITIAL_PRESETS: FormPreset[] = [
+  { id: 'site-survey', config: loadBundledConfig() },
+  {
+    id: 'tree-inventory',
+    config: require('../assets/form-config-tree-inventory.json') as FormConfig,
+  },
+  {
+    id: 'accessibility-audit',
+    config: require('../assets/form-config-accessibility-audit.json') as FormConfig,
+  },
 ];
 
 export default function HomeScreen() {
@@ -30,13 +46,25 @@ export default function HomeScreen() {
   const schema = useFormStore((s) => s.schema);
   const loadSchema = useFormStore((s) => s.loadSchema);
   const entries = useEntriesStore((s) => s.entries);
+  const hiddenPresetIds = usePickerStore((s) => s.hiddenPresetIds);
+  const hidePreset = usePickerStore((s) => s.hidePreset);
+  const customForms = usePickerStore((s) => s.customForms);
+  const addCustomForm = usePickerStore((s) => s.addCustomForm);
+  const removeCustomForm = usePickerStore((s) => s.removeCustomForm);
 
   const [sheet, setSheet] = useState<'config' | null>(null);
-  const [activeTitle, setActiveTitle] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const snackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const formTitle = activeTitle ?? schema?.formTitle ?? '—';
+  const customPresets: FormPreset[] = customForms.map(({ importId, config }) => ({
+    id: importId,
+    config,
+    custom: true,
+  }));
+  const presets = [...INITIAL_PRESETS, ...customPresets].filter(
+    (preset) => !hiddenPresetIds.includes(preset.id),
+  );
+  const formTitle = schema?.formTitle ?? '—';
   const sorted = [...entries].sort((a, b) => b.createdAt - a.createdAt);
   const recent = sorted.slice(0, 5);
   const total = entries.length;
@@ -50,10 +78,46 @@ export default function HomeScreen() {
     snackTimer.current = setTimeout(() => setSnackbar(null), 2600);
   }, []);
 
-  const pickPreset = (title: string) => {
-    setActiveTitle(title);
+  const pickPreset = (preset: FormPreset) => {
+    loadSchema(preset.config);
     setSheet(null);
     showSnack('Form loaded');
+  };
+
+  const deletePreset = (presetId: string) => {
+    const preset = presets.find((item) => item.id === presetId);
+    if (!preset) return;
+
+    Alert.alert(
+      'Delete form?',
+      `${preset.config.formTitle} will be removed from this list.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const deletedFormId = preset.config.formId;
+            if (preset.custom) {
+              removeCustomForm(presetId);
+            } else {
+              hidePreset(presetId);
+            }
+            const remaining = presets.filter((item) => item.id !== presetId);
+            if (schema?.formId === deletedFormId) {
+              loadSchema(remaining[0]?.config ?? loadBundledConfig());
+              showSnack(
+                remaining[0]
+                  ? `Switched to ${remaining[0].config.formTitle}`
+                  : 'Form deleted; restored default form',
+              );
+            } else {
+              showSnack('Form deleted');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const browseFiles = async () => {
@@ -65,8 +129,8 @@ export default function HomeScreen() {
       });
       if (result.canceled) return;
       const config = await loadFromPath(result.assets[0].uri);
+      addCustomForm(config);
       loadSchema(config);
-      setActiveTitle(null);
       showSnack(`Loaded: ${config.formTitle}`);
     } catch (e: any) {
       showSnack(e?.message ?? 'Invalid config file');
@@ -79,7 +143,7 @@ export default function HomeScreen() {
       <View style={styles.topBar}>
         <View style={styles.topLeft}>
           <View style={styles.logoBox}>
-            <MaterialIcons name="layers" size={20} color="#fff" />
+            <CollectorLogo width={30} height={30} />
           </View>
           <Text style={styles.appTitle}>Collector</Text>
         </View>
@@ -183,28 +247,55 @@ export default function HomeScreen() {
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Load form config</Text>
-            <Text style={styles.sheetSub}>Swap the schema this app collects against</Text>
+            <Text style={styles.sheetSub}>Load a form or delete one from the saved list</Text>
           </View>
-          {PRESETS.map((p) => (
-            <TouchableOpacity
-              key={p.title}
-              style={styles.sheetItem}
-              onPress={() => pickPreset(p.title)}
-            >
-              <MaterialIcons name="description" size={22} color="#006a60" />
-              <View style={styles.sheetItemBody}>
-                <Text style={styles.sheetItemTitle}>{p.title}</Text>
-                <Text style={styles.sheetItemSub}>{p.sub}</Text>
+          <ScrollView
+            style={styles.sheetScroll}
+            contentContainerStyle={styles.sheetScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {presets.length > 0 ? (
+              presets.map((preset) => {
+                const isActive = schema?.formId === preset.config.formId;
+                return (
+                  <View key={preset.id} style={styles.sheetItemRow}>
+                    <TouchableOpacity
+                      style={styles.sheetItem}
+                      onPress={() => pickPreset(preset)}
+                      activeOpacity={0.78}
+                    >
+                      <MaterialIcons name="description" size={22} color="#006a60" />
+                      <View style={styles.sheetItemBody}>
+                        <Text style={styles.sheetItemTitle}>{preset.config.formTitle}</Text>
+                        <Text style={styles.sheetItemSub}>
+                          {preset.config.fields.length} fields
+                        </Text>
+                      </View>
+                      {isActive && <MaterialIcons name="check-circle" size={22} color="#006a60" />}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteFormBtn}
+                      onPress={() => deletePreset(preset.id)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <MaterialIcons name="delete" size={18} color="#fff" />
+                      <Text style={styles.deleteFormText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.emptyForms}>
+                <MaterialIcons name="delete-forever" size={34} color="#9fb3ad" />
+                <Text style={styles.emptyFormsTitle}>No saved forms</Text>
+                <Text style={styles.emptyFormsHint}>Use device files to load a new form config.</Text>
               </View>
-              {formTitle === p.title && (
-                <MaterialIcons name="check-circle" size={22} color="#006a60" />
-              )}
+            )}
+            <TouchableOpacity style={[styles.sheetItem, styles.sheetDivider]} onPress={browseFiles}>
+              <MaterialIcons name="folder-open" size={22} color="#3f4946" />
+              <Text style={styles.sheetItemTitle}>Browse device files…</Text>
             </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={[styles.sheetItem, styles.sheetDivider]} onPress={browseFiles}>
-            <MaterialIcons name="folder-open" size={22} color="#3f4946" />
-            <Text style={styles.sheetItemTitle}>Browse device files…</Text>
-          </TouchableOpacity>
+          </ScrollView>
         </View>
       )}
 
@@ -433,11 +524,10 @@ const styles = StyleSheet.create({
 
   // Scrim
   scrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.42)',
     zIndex: 30,
   },
-
   // Sheet
   sheet: {
     position: 'absolute',
@@ -449,6 +539,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 10,
+    maxHeight: '82%',
     shadowColor: '#000',
     shadowOpacity: 0.18,
     shadowRadius: 15,
@@ -478,6 +569,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   sheetItem: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
@@ -485,6 +577,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginHorizontal: 8,
     borderRadius: 14,
+  },
+  sheetItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 8,
+    gap: 4,
   },
   sheetDivider: {
     marginTop: 2,
@@ -507,6 +605,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#3f4946',
     marginTop: 1,
+  },
+  deleteFormBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ba1a1a',
+    flexShrink: 0,
+  },
+  deleteFormText: {
+    display: 'none',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.2,
+  },
+  sheetScroll: {
+    flexGrow: 0,
+  },
+  sheetScrollContent: {
+    paddingBottom: 12,
+  },
+  emptyForms: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    gap: 6,
+  },
+  emptyFormsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#171d1b',
+  },
+  emptyFormsHint: {
+    fontSize: 12.5,
+    color: '#3f4946',
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 
   // Snackbar

@@ -1,26 +1,21 @@
 import { useState, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Pressable,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Swipeable, FlatList } from 'react-native-gesture-handler';
 import { useEntriesStore } from '../store/entriesStore';
 import EntryCard from '../components/EntryCard';
+import type { Entry } from '../types';
 
 export default function EntriesScreen() {
   const insets = useSafeAreaInsets();
   const entries = useEntriesStore((s) => s.entries);
   const deleteEntry = useEntriesStore((s) => s.deleteEntry);
 
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const snackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const swipeRefs = useRef<Map<string, Swipeable>>(new Map());
 
   const showSnack = useCallback((msg: string) => {
     setSnackbar(msg);
@@ -28,14 +23,54 @@ export default function EntriesScreen() {
     snackTimer.current = setTimeout(() => setSnackbar(null), 2600);
   }, []);
 
-  const sorted = [...entries].sort((a, b) => b.createdAt - a.createdAt);
-  const targetEntry = deleteTarget ? entries.find((e) => e.id === deleteTarget) : null;
+  const handleDelete = useCallback(
+    (id: string) => {
+      swipeRefs.current.get(id)?.close();
+      deleteEntry(id);
+      showSnack('Entry deleted');
+    },
+    [deleteEntry, showSnack],
+  );
 
-  const confirmDelete = () => {
-    if (deleteTarget) deleteEntry(deleteTarget);
-    setDeleteTarget(null);
-    showSnack('Entry deleted');
+  const sorted = [...entries].sort((a, b) => b.createdAt - a.createdAt);
+
+  const renderRightActions = (id: string, progress: Animated.AnimatedInterpolation<number>) => {
+    const translateX = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [80, 0],
+      extrapolate: 'clamp',
+    });
+    return (
+      <Animated.View style={[styles.deleteAction, { transform: [{ translateX }] }]}>
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => handleDelete(id)}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="delete" size={24} color="#fff" />
+          <Text style={styles.deleteLabel}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
   };
+
+  const renderItem = ({ item }: { item: Entry }) => (
+    <Swipeable
+      ref={(ref) => {
+        if (ref) swipeRefs.current.set(item.id, ref);
+        else swipeRefs.current.delete(item.id);
+      }}
+      renderRightActions={(progress) => renderRightActions(item.id, progress)}
+      overshootRight={false}
+      friction={2}
+    >
+      <EntryCard
+        entry={item}
+        onOpen={() => router.push(`/entry/${item.id}`)}
+        showCoords
+      />
+    </Swipeable>
+  );
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -50,35 +85,28 @@ export default function EntriesScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+      <FlatList
+        data={sorted}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 32 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.countLabel}>
-          {sorted.length} {sorted.length === 1 ? 'entry' : 'entries'} · newest first
-        </Text>
-
-        {sorted.length === 0 && (
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListHeaderComponent={
+          <Text style={styles.countLabel}>
+            {sorted.length} {sorted.length === 1 ? 'entry' : 'entries'} · newest first
+          </Text>
+        }
+        ListEmptyComponent={
           <View style={styles.empty}>
             <MaterialIcons name="inventory" size={46} color="#9fb3ad" />
             <Text style={styles.emptyTitle}>No entries yet</Text>
-            <Text style={styles.emptyHint}>Tap "New entry" on the home screen to get started.</Text>
+            <Text style={styles.emptyHint}>
+              Tap "New entry" on the home screen to get started.
+            </Text>
           </View>
-        )}
-
-        <View style={styles.cardList}>
-          {sorted.map((entry) => (
-            <EntryCard
-              key={entry.id}
-              entry={entry}
-              onOpen={() => router.push(`/entry/${entry.id}`)}
-              onDelete={() => setDeleteTarget(entry.id)}
-              showCoords
-            />
-          ))}
-        </View>
-      </ScrollView>
+        }
+      />
 
       {/* Snackbar */}
       {snackbar && (
@@ -86,34 +114,6 @@ export default function EntriesScreen() {
           <MaterialIcons name="check-circle" size={20} color="#83d5c6" />
           <Text style={styles.snackText}>{snackbar}</Text>
         </View>
-      )}
-
-      {/* Delete confirmation dialog */}
-      {deleteTarget && (
-        <>
-          <Pressable style={styles.scrim} onPress={() => setDeleteTarget(null)} />
-          <View style={styles.dialogOverlay}>
-            <View style={styles.dialog}>
-              <MaterialIcons name="delete" size={26} color="#006a60" />
-              <Text style={styles.dialogTitle}>Delete entry?</Text>
-              <Text style={styles.dialogBody}>
-                Entry #{String(targetEntry?.seq ?? '').padStart(2, '0')} —{' '}
-                {targetEntry?.data.site_name ?? ''} will be permanently removed.
-              </Text>
-              <View style={styles.dialogActions}>
-                <TouchableOpacity
-                  style={styles.dialogBtn}
-                  onPress={() => setDeleteTarget(null)}
-                >
-                  <Text style={styles.dialogBtnCancel}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.dialogBtn} onPress={confirmDelete}>
-                  <Text style={styles.dialogBtnDelete}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </>
       )}
     </View>
   );
@@ -144,10 +144,8 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
 
-  scroll: { flex: 1 },
-  scrollContent: {
+  listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 32,
   },
 
   countLabel: {
@@ -158,6 +156,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginLeft: 2,
   },
+
+  separator: { height: 10 },
 
   empty: {
     alignItems: 'center',
@@ -175,48 +175,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  cardList: { gap: 10 },
-
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.42)',
-    zIndex: 32,
-  },
-  dialogOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 33,
-    alignItems: 'center',
+  deleteAction: {
+    width: 88,
     justifyContent: 'center',
-    padding: 28,
+    alignItems: 'stretch',
+    marginLeft: 6,
   },
-  dialog: {
-    backgroundColor: '#eef5f1',
-    borderRadius: 28,
-    padding: 24,
-    width: '100%',
-    maxWidth: 320,
+  deleteBtn: {
+    flex: 1,
+    backgroundColor: '#ba1a1a',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
   },
-  dialogTitle: {
-    fontSize: 20,
-    fontWeight: '500',
-    color: '#171d1b',
-    marginTop: 14,
+  deleteLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.3,
   },
-  dialogBody: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: '#3f4946',
-    marginTop: 10,
-  },
-  dialogActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 6,
-    marginTop: 22,
-  },
-  dialogBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 100 },
-  dialogBtnCancel: { fontSize: 14, fontWeight: '600', color: '#006a60' },
-  dialogBtnDelete: { fontSize: 14, fontWeight: '600', color: '#ba1a1a' },
 
   snackbar: {
     position: 'absolute',

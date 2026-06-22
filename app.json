@@ -12,11 +12,10 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+        "backgroundColor": "#006A60",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "package": "com.anonymous.Collector"
     },
     "web": {
       "favicon": "./assets/favicon.png"

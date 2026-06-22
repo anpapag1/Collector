@@ -1,36 +1,8 @@
 {
   "formId": "campaign-001",
-  "formTitle": "Site Survey — Municipality X",
+  "formTitle": "amea",
   "version": "1.0",
   "fields": [
-    {
-      "id": "location",
-      "label": "GPS Location",
-      "type": "gps",
-      "auto": true,
-      "required": true
-    },
-    {
-      "id": "site_name",
-      "label": "Site name",
-      "type": "text",
-      "required": true,
-      "placeholder": "e.g. Central Square"
-    },
-    {
-      "id": "category",
-      "label": "Category",
-      "type": "select",
-      "required": true,
-      "options": ["Square", "Playground", "Sports Centre", "Park", "Other"]
-    },
-    {
-      "id": "rating",
-      "label": "Condition rating",
-      "type": "rating",
-      "max": 5,
-      "required": true
-    },
     {
       "id": "photo",
       "label": "Site photos",

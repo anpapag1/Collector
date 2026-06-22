@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts } from 'expo-font';
 import {
   Roboto_400Regular,
@@ -14,6 +16,7 @@ import { useFormStore } from '../store/formStore';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const schema = useFormStore((s) => s.schema);
   const loadSchema = useFormStore((s) => s.loadSchema);
 
   const [fontsLoaded] = useFonts({
@@ -24,7 +27,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded) {
-      loadSchema(loadBundledConfig());
+      if (!schema) {
+        loadSchema(loadBundledConfig());
+      }
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
@@ -32,9 +37,13 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <>
+    <GestureHandlerRootView style={styles.root}>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }} />
-    </>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});

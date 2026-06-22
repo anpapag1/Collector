@@ -1,4 +1,3 @@
-import * as FileSystem from 'expo-file-system';
 import { FormConfig } from '../types';
 
 export function loadBundledConfig(): FormConfig {
@@ -6,7 +5,7 @@ export function loadBundledConfig(): FormConfig {
 }
 
 export async function loadFromPath(uri: string): Promise<FormConfig> {
-  const content = await FileSystem.readAsStringAsync(uri);
+  const content = await (await fetch(uri)).text();
   const parsed = JSON.parse(content);
   if (!parsed.formId || !parsed.fields) {
     throw new Error('Invalid form-config: missing formId or fields');
