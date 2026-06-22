@@ -27,10 +27,12 @@ export default function ExportScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
 
-  const photoTotal = entries.reduce(
-    (sum, e) => sum + ((e.data.photo ?? []) as any[]).length,
-    0
-  );
+  const imageFieldId = schema?.fields.find((f) => f.type === 'image')?.id;
+  const photoTotal = entries.reduce((sum, e) => {
+    const fieldId = (e.fields?.find((f) => f.type === 'image')?.id) ?? imageFieldId;
+    if (!fieldId) return sum;
+    return sum + ((e.data[fieldId] ?? []) as any[]).length;
+  }, 0);
   const filename = schema ? exportFilename(schema.formId) : 'export.zip';
 
   useEffect(() => {
@@ -60,14 +62,24 @@ export default function ExportScreen() {
     animateTo(0);
 
     try {
-      const zipPath = await buildAndExport(entries, schema, (pct) => animateTo(pct));
+      const { path: zipPath, skippedPhotos } = await buildAndExport(entries, schema, (pct) =>
+        animateTo(pct)
+      );
       setPhase('done');
+      if (skippedPhotos > 0) {
+        setError(
+          `${skippedPhotos} photo${skippedPhotos === 1 ? '' : 's'} could not be read and were skipped from the export.`
+        );
+      }
       await Sharing.shareAsync(zipPath, {
         mimeType: 'application/zip',
         dialogTitle: 'Share export',
       });
-      // Navigate home after sharing
-      router.replace('/');
+      // Sharing.shareAsync resolves even if the user cancels the share sheet,
+      // so we can't reliably tell success from cancellation here. Stay on
+      // this screen and let the user navigate back themselves rather than
+      // risk redirecting home when nothing was actually shared.
+      setPhase('summary');
     } catch (e: any) {
       setError(e?.message ?? 'Export failed');
       setPhase('summary');

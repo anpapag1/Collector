@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, memo, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { FieldDef, FormSection, PhotoItem } from '../types';
 import { GpsStatus } from '../store/formStore';
@@ -23,7 +23,7 @@ type Props = {
   onGpsCapture?: () => void;
 };
 
-export default function DynamicForm({
+function DynamicForm({
   fields,
   sections = [],
   draft,
@@ -33,16 +33,32 @@ export default function DynamicForm({
   gpsStatus = 'idle',
   onGpsCapture,
 }: Props) {
-  const sectionById = Object.fromEntries(sections.map((s) => [s.id, s]));
-  let lastSectionId: string | undefined;
+  const sectionById = useMemo(
+    () => Object.fromEntries(sections.map((s) => [s.id, s])),
+    [sections],
+  );
+
+  // Determine, for each field, whether it should show its section header —
+  // built with reduce instead of a `let` mutated inside `.map()`.
+  const rows = useMemo(() => {
+    return fields.reduce<{ field: FieldDef; showHeader: boolean }[]>((acc, field) => {
+      const prevSectionId = acc.length > 0 ? acc[acc.length - 1].field.sectionId : undefined;
+      const showHeader = !!field.sectionId && field.sectionId !== prevSectionId;
+      acc.push({ field, showHeader });
+      return acc;
+    }, []);
+  }, [fields]);
+
+  const handleFieldChange = useCallback(
+    (id: string, value: any) => onFieldChange(id, value),
+    [onFieldChange],
+  );
 
   return (
     <View style={{ gap: 20 }}>
-      {fields.map((field) => {
+      {rows.map(({ field, showHeader }) => {
         if (!isFieldVisible(field, draft)) return null;
 
-        const showHeader = !!field.sectionId && field.sectionId !== lastSectionId;
-        lastSectionId = field.sectionId;
         const section = showHeader ? sectionById[field.sectionId!] : undefined;
 
         const value = draft[field.id];
@@ -56,7 +72,7 @@ export default function DynamicForm({
               </View>
             )}
             {renderField(field, value, error, {
-              onFieldChange,
+              onFieldChange: handleFieldChange,
               onAddPhotoPress,
               gpsStatus,
               onGpsCapture,
@@ -67,6 +83,8 @@ export default function DynamicForm({
     </View>
   );
 }
+
+export default memo(DynamicForm);
 
 function renderField(
   field: FieldDef,

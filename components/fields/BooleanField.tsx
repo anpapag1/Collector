@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef } from '../../types';
@@ -9,7 +10,7 @@ type Props = {
   error?: boolean;
 };
 
-export default function BooleanField({ field, value, onChange, error }: Props) {
+function BooleanField({ field, value, onChange, error }: Props) {
   return (
     <View>
       <Text style={styles.label}>
@@ -102,3 +103,5 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 });
+
+export default memo(BooleanField);

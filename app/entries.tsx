@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -8,6 +8,11 @@ import { useEntriesStore } from '../store/entriesStore';
 import EntryCard from '../components/EntryCard';
 import Toast from '../components/Toast';
 import type { Entry } from '../types';
+
+const SWIPE_ACTION_WIDTH = 80;
+const SNACKBAR_TIMEOUT_MS = 2600;
+const TOAST_BOTTOM_OFFSET = 24;
+const LIST_BOTTOM_PADDING = 32;
 
 export default function EntriesScreen() {
   const insets = useSafeAreaInsets();
@@ -21,7 +26,7 @@ export default function EntriesScreen() {
   const showSnack = useCallback((msg: string) => {
     setSnackbar(msg);
     if (snackTimer.current) clearTimeout(snackTimer.current);
-    snackTimer.current = setTimeout(() => setSnackbar(null), 2600);
+    snackTimer.current = setTimeout(() => setSnackbar(null), SNACKBAR_TIMEOUT_MS);
   }, []);
 
   const handleDelete = useCallback(
@@ -33,12 +38,15 @@ export default function EntriesScreen() {
     [deleteEntry, showSnack],
   );
 
-  const sorted = [...entries].sort((a, b) => b.createdAt - a.createdAt);
+  const sorted = useMemo(
+    () => [...entries].sort((a, b) => b.createdAt - a.createdAt),
+    [entries],
+  );
 
   const renderRightActions = (id: string, progress: Animated.AnimatedInterpolation<number>) => {
     const translateX = progress.interpolate({
       inputRange: [0, 1],
-      outputRange: [80, 0],
+      outputRange: [SWIPE_ACTION_WIDTH, 0],
       extrapolate: 'clamp',
     });
     return (
@@ -90,7 +98,7 @@ export default function EntriesScreen() {
         data={sorted}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={[styles.listContent, { paddingBottom: 32 + insets.bottom }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: LIST_BOTTOM_PADDING + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={
@@ -109,7 +117,7 @@ export default function EntriesScreen() {
         }
       />
 
-      <Toast message={snackbar} onDismiss={() => setSnackbar(null)} bottom={24 + insets.bottom} />
+      <Toast message={snackbar} onDismiss={() => setSnackbar(null)} bottom={TOAST_BOTTOM_OFFSET + insets.bottom} />
     </View>
   );
 }

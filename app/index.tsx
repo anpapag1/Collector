@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   Alert,
   Platform,
@@ -40,6 +40,12 @@ const INITIAL_PRESETS: FormPreset[] = [
   { id: 'erwtimatologio', config: require('../assets/Erwtimatologio_simiou.json') as FormConfig },
 ];
 
+const SNACKBAR_TIMEOUT_MS = 2600;
+const BOTTOM_BAR_HEIGHT = 84;
+const ENTRY_SWIPE_ACTION_WIDTH = 80;
+const FORM_SWIPE_ACTION_WIDTH = 168;
+const HERO_SWIPE_ACTION_WIDTH = 104;
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const schema = useFormStore((s) => s.schema);
@@ -63,29 +69,50 @@ export default function HomeScreen() {
   const heroSwipeRef = useRef<Swipeable>(null);
   const entrySwipeRefs = useRef<Map<string, Swipeable>>(new Map());
 
-  const customPresets: FormPreset[] = customForms
-    .filter(({ config }) => config?.formTitle && config?.fields)
-    .map(({ importId, config }) => ({
-      id: importId,
-      config,
-      custom: true,
-    }));
-  const presets = [...INITIAL_PRESETS, ...customPresets].filter(
-    (preset) => !hiddenPresetIds.includes(preset.id),
+  const customPresets: FormPreset[] = useMemo(
+    () =>
+      customForms
+        .filter(({ config }) => config?.formTitle && config?.fields)
+        .map(({ importId, config }) => ({
+          id: importId,
+          config,
+          custom: true,
+        })),
+    [customForms],
   );
-  const formTitle = schema?.formTitle ?? '—';
-  const sorted = [...entries].sort((a, b) => b.createdAt - a.createdAt);
-  const recent = sorted.slice(0, 3);
-  const total = entries.length;
-  const lastLabel = total
-    ? `Last entry ${timeAgo(sorted[0].createdAt)}`
-    : 'No entries yet';
+  const malformedCustomFormCount = customForms.length - customPresets.length;
+  const presets = useMemo(
+    () =>
+      [...INITIAL_PRESETS, ...customPresets].filter(
+        (preset) => !hiddenPresetIds.includes(preset.id),
+      ),
+    [customPresets, hiddenPresetIds],
+  );
+  const formTitle = useMemo(() => schema?.formTitle ?? '—', [schema]);
+  const sorted = useMemo(
+    () => [...entries].sort((a, b) => b.createdAt - a.createdAt),
+    [entries],
+  );
+  const recent = useMemo(() => sorted.slice(0, 3), [sorted]);
+  const total = useMemo(() => entries.length, [entries]);
+  const lastLabel = useMemo(
+    () => (total ? `Last entry ${timeAgo(sorted[0].createdAt)}` : 'No entries yet'),
+    [total, sorted],
+  );
 
   const showSnack = useCallback((msg: string) => {
     setSnackbar(msg);
     if (snackTimer.current) clearTimeout(snackTimer.current);
-    snackTimer.current = setTimeout(() => setSnackbar(null), 2600);
+    snackTimer.current = setTimeout(() => setSnackbar(null), SNACKBAR_TIMEOUT_MS);
   }, []);
+
+  useEffect(() => {
+    if (malformedCustomFormCount > 0) {
+      showSnack(
+        `${malformedCustomFormCount} saved form${malformedCustomFormCount === 1 ? '' : 's'} could not be loaded.`,
+      );
+    }
+  }, [malformedCustomFormCount, showSnack]);
 
   const closeSwipe = (id: string) => {
     swipeFormRefs.current.get(id)?.close();
@@ -106,7 +133,7 @@ export default function HomeScreen() {
   ) => {
     const translateX = progress.interpolate({
       inputRange: [0, 1],
-      outputRange: [80, 0],
+      outputRange: [ENTRY_SWIPE_ACTION_WIDTH, 0],
       extrapolate: 'clamp',
     });
     return (
@@ -143,20 +170,29 @@ export default function HomeScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            const deletedFormId = preset.config.formId;
             if (preset.custom) {
               removeCustomForm(presetId);
             } else {
               hidePreset(presetId);
             }
-            const remaining = presets.filter((item) => item.id !== presetId);
-            if (remaining.length === 0) {
-              clearSchema();
-              setActivePresetId(null);
+
+            // Read live store state instead of the closed-over `presets`/`activePresetId`
+            // variables, which may be stale by the time this async alert callback fires.
+            const pickerState = usePickerStore.getState();
+            const liveCustomPresets: FormPreset[] = pickerState.customForms
+              .filter(({ config }) => config?.formTitle && config?.fields)
+              .map(({ importId, config }) => ({ id: importId, config, custom: true }));
+            const liveRemaining = [...INITIAL_PRESETS, ...liveCustomPresets].filter(
+              (item) => !pickerState.hiddenPresetIds.includes(item.id) && item.id !== presetId,
+            );
+
+            if (liveRemaining.length === 0) {
+              useFormStore.getState().clearSchema();
+              usePickerStore.getState().setActivePresetId(null);
               showSnack('No forms left — import a form to continue');
-            } else if (activePresetId === presetId) {
-              loadSchema(remaining[0].config);
-              setActivePresetId(remaining[0].id);
+            } else if (pickerState.activePresetId === presetId) {
+              useFormStore.getState().loadSchema(liveRemaining[0].config);
+              usePickerStore.getState().setActivePresetId(liveRemaining[0].id);
             }
           },
         },
@@ -168,7 +204,7 @@ export default function HomeScreen() {
     closeSwipe(preset.id);
     try {
       const json = JSON.stringify(preset.config, null, 2);
-      const fileName = `${preset.config.formTitle.replace(/\s+/g, '_')}.json`;
+      const fileName = `${preset.config.formTitle.replace(/[\s/\\:*?"<>|]+/g, '_')}.json`;
 
       if (Platform.OS === 'android') {
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
@@ -185,8 +221,8 @@ export default function HomeScreen() {
         file.write(json);
         await Sharing.shareAsync(file.uri, { mimeType: 'application/json' });
       }
-    } catch (e: any) {
-      showSnack(e?.message ?? 'Export failed');
+    } catch (e) {
+      showSnack(e instanceof Error ? e.message : 'Export failed');
     }
   };
 
@@ -196,7 +232,7 @@ export default function HomeScreen() {
   ) => {
     const translateX = progress.interpolate({
       inputRange: [0, 1],
-      outputRange: [168, 0],
+      outputRange: [FORM_SWIPE_ACTION_WIDTH, 0],
       extrapolate: 'clamp',
     });
     return (
@@ -235,7 +271,7 @@ export default function HomeScreen() {
   };
 
   const renderHeroLeftActions = (progress: Animated.AnimatedInterpolation<number>) => {
-    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [-104, 0], extrapolate: 'clamp' });
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [-HERO_SWIPE_ACTION_WIDTH, 0], extrapolate: 'clamp' });
     return (
       <Animated.View style={[styles.heroAction, styles.heroActionLeft, { transform: [{ translateX }] }]}>
         <TouchableOpacity
@@ -251,7 +287,7 @@ export default function HomeScreen() {
   };
 
   const renderHeroRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
-    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [104, 0], extrapolate: 'clamp' });
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [HERO_SWIPE_ACTION_WIDTH, 0], extrapolate: 'clamp' });
     return (
       <Animated.View style={[styles.heroAction, styles.heroActionRight, { transform: [{ translateX }] }]}>
         <TouchableOpacity
@@ -279,8 +315,8 @@ export default function HomeScreen() {
       addCustomForm(config, importId);
       loadSchema(config);
       setActivePresetId(importId);
-    } catch (e: any) {
-      showSnack(e?.message ?? 'Invalid config file');
+    } catch (e) {
+      showSnack(e instanceof Error ? e.message : 'Invalid config file');
     }
   };
 
@@ -475,7 +511,7 @@ export default function HomeScreen() {
       <Toast
         message={snackbar}
         onDismiss={() => setSnackbar(null)}
-        bottom={84 + insets.bottom}
+        bottom={BOTTOM_BAR_HEIGHT + insets.bottom}
         icon={snackbar?.startsWith('No forms') ? 'info-outline' : 'check-circle'}
       />
     </View>

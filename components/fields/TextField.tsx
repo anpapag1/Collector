@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { FieldDef } from '../../types';
 
@@ -10,7 +10,7 @@ type Props = {
   numeric?: boolean;
 };
 
-export default function TextField({ field, value, onChange, error, numeric }: Props) {
+function TextField({ field, value, onChange, error, numeric }: Props) {
   const [focused, setFocused] = useState(false);
 
   const handleChange = (text: string) => {
@@ -79,3 +79,5 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 });
+
+export default memo(TextField);

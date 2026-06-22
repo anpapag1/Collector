@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FormConfig, EntryData } from '../types';
+import { safeAsyncStorage } from './entriesStore';
 
 export type GpsStatus = 'idle' | 'capturing' | 'done';
 
@@ -37,7 +37,7 @@ export const useFormStore = create<FormState>()(
     }),
     {
       name: 'form-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => safeAsyncStorage),
       partialize: (s) => ({ schema: s.schema, hasInitialized: s.hasInitialized }),
     }
   )

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef } from '../../types';
@@ -9,7 +10,7 @@ type Props = {
   error?: boolean;
 };
 
-export default function RatingField({ field, value, onChange, error }: Props) {
+function RatingField({ field, value, onChange, error }: Props) {
   const max = field.max ?? 5;
 
   return (
@@ -48,3 +49,5 @@ const styles = StyleSheet.create({
   },
   errorText: { fontSize: 12, color: '#ba1a1a', marginTop: 6 },
 });
+
+export default memo(RatingField);

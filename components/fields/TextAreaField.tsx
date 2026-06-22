@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { FieldDef } from '../../types';
 
@@ -9,7 +9,7 @@ type Props = {
   error?: boolean;
 };
 
-export default function TextAreaField({ field, value, onChange, error }: Props) {
+function TextAreaField({ field, value, onChange, error }: Props) {
   const [focused, setFocused] = useState(false);
 
   return (
@@ -69,3 +69,5 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#ba1a1a' },
   errorText: { fontSize: 12, color: '#ba1a1a', marginTop: 5 },
 });
+
+export default memo(TextAreaField);

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef, SelectValue } from '../../types';
@@ -12,7 +13,7 @@ type Props = {
 
 const OTHER_LABEL = 'Other';
 
-export default function SelectField({ field, value, onChange, error }: Props) {
+function SelectField({ field, value, onChange, error }: Props) {
   const multi = !!field.multiple;
   const selected: SelectValue[] = multi
     ? Array.isArray(value) ? value : []
@@ -183,3 +184,5 @@ const styles = StyleSheet.create({
   },
   errorText: { fontSize: 12, color: '#ba1a1a', marginTop: 6 },
 });
+
+export default memo(SelectField);

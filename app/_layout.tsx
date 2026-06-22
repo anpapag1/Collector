@@ -14,7 +14,7 @@ import { loadBundledConfig } from '../utils/schemaLoader';
 import { useFormStore } from '../store/formStore';
 import { usePickerStore } from '../store/pickerStore';
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const hasInitialized = useFormStore((s) => s.hasInitialized);
@@ -35,7 +35,7 @@ export default function RootLayout() {
       }
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, hasInitialized, loadSchema, setActivePresetId]);
 
   if (!fontsLoaded) return null;
 

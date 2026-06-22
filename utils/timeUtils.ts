@@ -1,5 +1,6 @@
 export function timeAgo(ms: number): string {
-  const s = (Date.now() - ms) / 1000;
+  let s = (Date.now() - ms) / 1000;
+  if (s < 0) s = 0;
   if (s < 60) return 'just now';
   const m = s / 60;
   if (m < 60) return `${Math.floor(m)} min ago`;

@@ -5,7 +5,7 @@ export function isOtherValue(v: any): v is OtherValue {
 }
 
 export function selectValueLabel(v: SelectValue): string {
-  return isOtherValue(v) ? `Other: ${v.otherText}` : v;
+  return isOtherValue(v) ? `Other: ${v.otherText}` : String(v);
 }
 
 // A field is visible when it has no showIf, or when the referenced field's

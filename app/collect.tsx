@@ -35,6 +35,7 @@ export default function CollectScreen() {
   const [photoSheet, setPhotoSheet] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const snackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   const showSnack = useCallback((msg: string) => {
     setSnackbar(msg);
@@ -43,13 +44,17 @@ export default function CollectScreen() {
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
     resetDraft();
     const gpsField = schema?.fields.find((f) => f.type === 'gps');
     if (gpsField?.auto) runGps();
     schema?.fields
       .filter((f) => f.type === 'date' && f.auto)
       .forEach((f) => setField(f.id, new Date().toISOString()));
-    return () => { if (snackTimer.current) clearTimeout(snackTimer.current); };
+    return () => {
+      isMountedRef.current = false;
+      if (snackTimer.current) clearTimeout(snackTimer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -64,7 +69,7 @@ export default function CollectScreen() {
   const isDirty = useCallback(() => {
     return Object.values(draft).some((v) => {
       if (Array.isArray(v)) return v.length > 0;
-      if (typeof v === 'number') return v > 0;
+      if (typeof v === 'number') return true;
       if (typeof v === 'string') return v.trim().length > 0;
       return !!v;
     });
@@ -74,9 +79,11 @@ export default function CollectScreen() {
     setGpsStatus('capturing');
     try {
       const loc = await captureLocation();
+      if (!isMountedRef.current) return;
       setField('location', loc);
       setGpsStatus('done');
     } catch {
+      if (!isMountedRef.current) return;
       setGpsStatus('idle');
     }
   };
@@ -88,6 +95,7 @@ export default function CollectScreen() {
   const progress = requiredFields.length > 0 ? filledCount / requiredFields.length : 1;
 
   const handleSave = () => {
+    if (!schema) return;
     if (savedFlash) return;
 
     const hasUnfilled = requiredFields.some((f) => !isFieldFilled(f, draft[f.id]));
@@ -98,7 +106,7 @@ export default function CollectScreen() {
       return;
     }
 
-    addEntry({ ...draft }, schema!.fields, schema!.formTitle);
+    addEntry({ ...draft }, schema.fields, schema.formTitle);
     setSavedFlash(true);
     resetDraft();
     router.replace('/');
@@ -106,6 +114,11 @@ export default function CollectScreen() {
 
   const pickImage = async (source: 'camera' | 'library') => {
     setPhotoSheet(false);
+    const imageFieldId = schema?.fields.find((f) => f.type === 'image')?.id;
+    if (!imageFieldId) {
+      showSnack('No photo field on this form');
+      return;
+    }
     try {
       const result =
         source === 'camera'
@@ -117,9 +130,11 @@ export default function CollectScreen() {
         const dest = new File(Paths.document, `${id}.jpg`);
         picked.copy(dest);
         const newPhoto: PhotoItem = { id, uri: dest.uri };
-        setField('photo', [...(draft.photo ?? []), newPhoto]);
+        setField(imageFieldId, [...(draft[imageFieldId] ?? []), newPhoto]);
       }
-    } catch {}
+    } catch {
+      showSnack('Could not add photo');
+    }
   };
 
   const handleBack = () => {

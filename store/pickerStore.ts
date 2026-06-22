@@ -1,7 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { create } from 'zustand';
 import { FormConfig } from '../types';
+import { safeAsyncStorage } from './entriesStore';
 
 export type CustomForm = {
   importId: string;
@@ -51,7 +51,7 @@ export const usePickerStore = create<PickerState>()(
     }),
     {
       name: 'picker-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => safeAsyncStorage),
       partialize: (state) => ({
         hiddenPresetIds: state.hiddenPresetIds,
         customForms: state.customForms,

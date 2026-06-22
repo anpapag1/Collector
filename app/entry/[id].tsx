@@ -127,7 +127,13 @@ function renderField(field: FieldDef, value: any) {
       );
     case 'date': {
       const d = new Date(value);
-      if (isNaN(d.getTime())) return null;
+      if (isNaN(d.getTime())) {
+        return (
+          <FieldRow key={field.id} label={field.label}>
+            <Text style={styles.fieldValue}>Invalid date</Text>
+          </FieldRow>
+        );
+      }
       return (
         <FieldRow key={field.id} label={field.label}>
           <Text style={styles.fieldValue}>{formatDate(d.getTime())}</Text>
@@ -224,9 +230,15 @@ function GpsSection({ location }: { location: GpsLocation | undefined }) {
           {location ? (
             <>
               <Text style={styles.gpsCoords}>
-                {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
+                {Number(location.lat).toFixed(5)}, {Number(location.lng).toFixed(5)}
               </Text>
-              <Text style={styles.gpsSub}>Accuracy ±{location.accuracy.toFixed(1)} m</Text>
+              <Text style={styles.gpsSub}>
+                Accuracy{' '}
+                {(() => {
+                  const acc = Number(location.accuracy);
+                  return Number.isFinite(acc) ? `±${acc.toFixed(1)} m` : 'unknown';
+                })()}
+              </Text>
             </>
           ) : (
             <Text style={styles.gpsSub}>No location captured</Text>

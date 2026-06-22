@@ -26,20 +26,37 @@ function exportFilename(formId: string): string {
   return `export-${formId}-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.zip`;
 }
 
+function imageFieldIdFor(entry: Entry, schema: FormConfig): string | undefined {
+  const fields = entry.fields ?? schema.fields;
+  return fields.find((f) => f.type === 'image')?.id;
+}
+
 export async function buildAndExport(
   entries: Entry[],
   schema: FormConfig,
   onProgress: (pct: number) => void
-): Promise<string> {
+): Promise<{ path: string; skippedPhotos: number }> {
   const zip = new JSZip();
   const imgFolder = zip.folder('images')!;
   const filename = exportFilename(schema.formId);
 
+  // Precompute the total photo count across all entries up front so progress
+  // reporting is based on one consistent denominator instead of mixing a
+  // shared counter against each entry's local photo count.
+  const totalPhotos = entries.reduce((sum, entry) => {
+    const fieldId = imageFieldIdFor(entry, schema);
+    const photos: PhotoItem[] = fieldId ? (entry.data[fieldId] ?? []) : [];
+    return sum + photos.length;
+  }, 0);
+
+  let processedPhotos = 0;
+  let skippedPhotos = 0;
+
   // Build serialisable entries with relative image paths
-  let photoTotal = 0;
   const serialised = await Promise.all(
     entries.map(async (entry) => {
-      const photos: PhotoItem[] = entry.data.photo ?? [];
+      const fieldId = imageFieldIdFor(entry, schema);
+      const photos: PhotoItem[] = fieldId ? (entry.data[fieldId] ?? []) : [];
       const imagePaths: string[] = [];
 
       for (let i = 0; i < photos.length; i++) {
@@ -51,18 +68,22 @@ export async function buildAndExport(
           });
           imgFolder.file(imgName, b64, { base64: true });
           imagePaths.push(`images/${imgName}`);
-          photoTotal++;
         } catch {
-          // skip unreadable photo
+          // skip unreadable photo, but track it so the caller can surface it
+          skippedPhotos++;
         }
-        onProgress(Math.round(((photoTotal + 1) / (photos.length + 1)) * 60));
+        processedPhotos++;
+        if (totalPhotos > 0) {
+          onProgress(Math.round((processedPhotos / totalPhotos) * 60));
+        }
       }
 
+      const imageData = fieldId ? { [fieldId]: imagePaths } : {};
       return {
         id: entry.id,
         seq: entry.seq,
         createdAt: new Date(entry.createdAt).toISOString(),
-        data: { ...flattenSelectValues(entry, schema), photo: imagePaths },
+        data: { ...flattenSelectValues(entry, schema), ...imageData },
       };
     })
   );
@@ -94,7 +115,7 @@ export async function buildAndExport(
 
   onProgress(100);
 
-  return outPath;
+  return { path: outPath, skippedPhotos };
 }
 
 export { exportFilename };

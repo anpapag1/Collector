@@ -5,7 +5,6 @@ node_modules/
 
 # Expo
 .expo/
-.claude/
 dist/
 web-build/
 expo-env.d.ts
@@ -53,4 +52,5 @@ yarn-error.*
 # IDE
 .vscode/
 .idea/
-.claude/worktrees/
+.claude/
+CODE_REVIEW.md

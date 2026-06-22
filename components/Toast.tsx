@@ -31,7 +31,11 @@ export default function Toast({ message, onDismiss, bottom = 32, icon = 'check-c
   if (!message) return null;
 
   return (
-    <Animated.View style={[styles.wrap, { bottom, opacity, transform: [{ translateY }] }]}>
+    <Animated.View
+      style={[styles.wrap, { bottom, opacity, transform: [{ translateY }] }]}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+    >
       <TouchableOpacity style={styles.pill} onPress={onDismiss} activeOpacity={0.75}>
         <MaterialIcons name={icon} size={15} color="rgba(131,213,198,0.9)" />
         <Text style={styles.text} numberOfLines={2}>{message}</Text>

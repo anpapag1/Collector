@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef, PhotoItem } from '../../types';
@@ -9,7 +10,7 @@ type Props = {
   onAddPress: () => void;
 };
 
-export default function ImageField({ field, value, onChange, onAddPress }: Props) {
+function ImageField({ field, value, onChange, onAddPress }: Props) {
   const remove = (id: string) => onChange(value.filter((p) => p.id !== id));
 
   return (
@@ -87,3 +88,5 @@ const styles = StyleSheet.create({
     color: '#006a60',
   },
 });
+
+export default memo(ImageField);
