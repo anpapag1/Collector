@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback } from 'react';
 import {
   Alert,
+  Platform,
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   Pressable,
   StyleSheet,
@@ -14,11 +14,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { StorageAccessFramework, writeAsStringAsync, EncodingType } from 'expo-file-system/legacy';
+import { Swipeable, ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import CollectorLogo from '../assets/Collector_Logo.svg';
 import { useFormStore } from '../store/formStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { usePickerStore } from '../store/pickerStore';
 import EntryCard from '../components/EntryCard';
+import Toast from '../components/Toast';
 import { FormConfig } from '../types';
 import { timeAgo } from '../utils/timeUtils';
 import { loadBundledConfig, loadFromPath } from '../utils/schemaLoader';
@@ -30,43 +35,47 @@ type FormPreset = {
 };
 
 const INITIAL_PRESETS: FormPreset[] = [
-  { id: 'site-survey', config: loadBundledConfig() },
-  {
-    id: 'tree-inventory',
-    config: require('../assets/form-config-tree-inventory.json') as FormConfig,
-  },
-  {
-    id: 'accessibility-audit',
-    config: require('../assets/form-config-accessibility-audit.json') as FormConfig,
-  },
+  { id: 'template', config: loadBundledConfig() },
+  // add assets\Erwtimatologio_simiou.json to presets for testing import
+  { id: 'erwtimatologio', config: require('../assets/Erwtimatologio_simiou.json') as FormConfig },
 ];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const schema = useFormStore((s) => s.schema);
   const loadSchema = useFormStore((s) => s.loadSchema);
+  const clearSchema = useFormStore((s) => s.clearSchema);
   const entries = useEntriesStore((s) => s.entries);
+  const clearEntries = useEntriesStore((s) => s.clearEntries);
+  const deleteEntry = useEntriesStore((s) => s.deleteEntry);
   const hiddenPresetIds = usePickerStore((s) => s.hiddenPresetIds);
   const hidePreset = usePickerStore((s) => s.hidePreset);
   const customForms = usePickerStore((s) => s.customForms);
   const addCustomForm = usePickerStore((s) => s.addCustomForm);
   const removeCustomForm = usePickerStore((s) => s.removeCustomForm);
+  const activePresetId = usePickerStore((s) => s.activePresetId);
+  const setActivePresetId = usePickerStore((s) => s.setActivePresetId);
 
   const [sheet, setSheet] = useState<'config' | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const snackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const swipeFormRefs = useRef<Map<string, Swipeable>>(new Map());
+  const heroSwipeRef = useRef<Swipeable>(null);
+  const entrySwipeRefs = useRef<Map<string, Swipeable>>(new Map());
 
-  const customPresets: FormPreset[] = customForms.map(({ importId, config }) => ({
-    id: importId,
-    config,
-    custom: true,
-  }));
+  const customPresets: FormPreset[] = customForms
+    .filter(({ config }) => config?.formTitle && config?.fields)
+    .map(({ importId, config }) => ({
+      id: importId,
+      config,
+      custom: true,
+    }));
   const presets = [...INITIAL_PRESETS, ...customPresets].filter(
     (preset) => !hiddenPresetIds.includes(preset.id),
   );
   const formTitle = schema?.formTitle ?? '—';
   const sorted = [...entries].sort((a, b) => b.createdAt - a.createdAt);
-  const recent = sorted.slice(0, 5);
+  const recent = sorted.slice(0, 3);
   const total = entries.length;
   const lastLabel = total
     ? `Last entry ${timeAgo(sorted[0].createdAt)}`
@@ -78,21 +87,58 @@ export default function HomeScreen() {
     snackTimer.current = setTimeout(() => setSnackbar(null), 2600);
   }, []);
 
+  const closeSwipe = (id: string) => {
+    swipeFormRefs.current.get(id)?.close();
+  };
+
+  const handleDeleteEntry = useCallback(
+    (id: string) => {
+      entrySwipeRefs.current.get(id)?.close();
+      deleteEntry(id);
+      showSnack('Entry deleted');
+    },
+    [deleteEntry, showSnack],
+  );
+
+  const renderEntryRightActions = (
+    id: string,
+    progress: Animated.AnimatedInterpolation<number>,
+  ) => {
+    const translateX = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [80, 0],
+      extrapolate: 'clamp',
+    });
+    return (
+      <Animated.View style={[styles.deleteAction, { transform: [{ translateX }] }]}>
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => handleDeleteEntry(id)}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="delete" size={24} color="#fff" />
+          <Text style={styles.deleteLabel}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
   const pickPreset = (preset: FormPreset) => {
     loadSchema(preset.config);
+    setActivePresetId(preset.id);
     setSheet(null);
-    showSnack('Form loaded');
   };
 
   const deletePreset = (presetId: string) => {
     const preset = presets.find((item) => item.id === presetId);
     if (!preset) return;
+    closeSwipe(presetId);
 
     Alert.alert(
       'Delete form?',
       `${preset.config.formTitle} will be removed from this list.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => closeSwipe(presetId) },
         {
           text: 'Delete',
           style: 'destructive',
@@ -104,19 +150,119 @@ export default function HomeScreen() {
               hidePreset(presetId);
             }
             const remaining = presets.filter((item) => item.id !== presetId);
-            if (schema?.formId === deletedFormId) {
-              loadSchema(remaining[0]?.config ?? loadBundledConfig());
-              showSnack(
-                remaining[0]
-                  ? `Switched to ${remaining[0].config.formTitle}`
-                  : 'Form deleted; restored default form',
-              );
-            } else {
-              showSnack('Form deleted');
+            if (remaining.length === 0) {
+              clearSchema();
+              setActivePresetId(null);
+              showSnack('No forms left — import a form to continue');
+            } else if (activePresetId === presetId) {
+              loadSchema(remaining[0].config);
+              setActivePresetId(remaining[0].id);
             }
           },
         },
       ],
+    );
+  };
+
+  const downloadPreset = async (preset: FormPreset) => {
+    closeSwipe(preset.id);
+    try {
+      const json = JSON.stringify(preset.config, null, 2);
+      const fileName = `${preset.config.formTitle.replace(/\s+/g, '_')}.json`;
+
+      if (Platform.OS === 'android') {
+        const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) return;
+        const uri = await StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          fileName,
+          'application/json',
+        );
+        await writeAsStringAsync(uri, json, { encoding: EncodingType.UTF8 });
+        showSnack(`Saved as ${fileName}`);
+      } else {
+        const file = new File(Paths.cache, fileName);
+        file.write(json);
+        await Sharing.shareAsync(file.uri, { mimeType: 'application/json' });
+      }
+    } catch (e: any) {
+      showSnack(e?.message ?? 'Export failed');
+    }
+  };
+
+  const renderFormRightActions = (
+    preset: FormPreset,
+    progress: Animated.AnimatedInterpolation<number>,
+  ) => {
+    const translateX = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [168, 0],
+      extrapolate: 'clamp',
+    });
+    return (
+      <Animated.View style={[styles.formActions, { transform: [{ translateX }] }]}>
+        <TouchableOpacity
+          style={styles.downloadFormBtn}
+          onPress={() => downloadPreset(preset)}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="download" size={20} color="#fff" />
+          <Text style={styles.actionLabel}>Save</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteFormBtn}
+          onPress={() => deletePreset(preset.id)}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="delete" size={20} color="#fff" />
+          <Text style={styles.actionLabel}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const handleDeleteAll = () => {
+    heroSwipeRef.current?.close();
+    if (total === 0) { showSnack('No entries to delete'); return; }
+    Alert.alert(
+      'Delete all entries?',
+      `This will permanently remove all ${total} ${total === 1 ? 'entry' : 'entries'} and reset the counter to zero.`,
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => heroSwipeRef.current?.close() },
+        { text: 'Delete all', style: 'destructive', onPress: () => { clearEntries(); showSnack('All entries deleted'); } },
+      ],
+    );
+  };
+
+  const renderHeroLeftActions = (progress: Animated.AnimatedInterpolation<number>) => {
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [-104, 0], extrapolate: 'clamp' });
+    return (
+      <Animated.View style={[styles.heroAction, styles.heroActionLeft, { transform: [{ translateX }] }]}>
+        <TouchableOpacity
+          style={[styles.heroActionBtn, { backgroundColor: '#006a60' }]}
+          onPress={() => { heroSwipeRef.current?.close(); router.push('/export'); }}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="ios-share" size={22} color="#fff" />
+          <Text style={styles.heroActionLabel}>Export</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const renderHeroRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [104, 0], extrapolate: 'clamp' });
+    return (
+      <Animated.View style={[styles.heroAction, styles.heroActionRight, { transform: [{ translateX }] }]}>
+        <TouchableOpacity
+          style={[styles.heroActionBtn, { backgroundColor: '#a1161f' }]}
+          onPress={handleDeleteAll}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="delete-sweep" size={22} color="#fff" />
+          <Text style={styles.heroActionLabel}>Delete all</Text>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
@@ -129,9 +275,10 @@ export default function HomeScreen() {
       });
       if (result.canceled) return;
       const config = await loadFromPath(result.assets[0].uri);
-      addCustomForm(config);
+      const importId = `custom-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      addCustomForm(config, importId);
       loadSchema(config);
-      showSnack(`Loaded: ${config.formTitle}`);
+      setActivePresetId(importId);
     } catch (e: any) {
       showSnack(e?.message ?? 'Invalid config file');
     }
@@ -147,57 +294,63 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.appTitle}>Collector</Text>
         </View>
-        <View style={styles.topRight}>
-          <TouchableOpacity style={styles.pill} onPress={() => router.push('/entries')}>
-            <MaterialIcons name="list-alt" size={18} color="#06201b" />
-            <Text style={styles.pillText}>Entries</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.pill} onPress={() => router.push('/export')}>
-            <MaterialIcons name="ios-share" size={18} color="#06201b" />
-            <Text style={styles.pillText}>Export</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* ── Body ── */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.body}>
         {/* Active form button */}
-        <TouchableOpacity style={styles.formBtn} onPress={() => setSheet('config')}>
-          <MaterialIcons name="description" size={22} color="#006a60" />
+        <TouchableOpacity
+          style={[styles.formBtn, !schema && styles.formBtnEmpty]}
+          onPress={() => setSheet('config')}
+        >
+          <MaterialIcons
+            name={schema ? 'description' : 'file-present'}
+            size={22}
+            color={schema ? '#006a60' : '#9fb3ad'}
+          />
           <View style={styles.formBtnBody}>
             <Text style={styles.formLabel}>Active form</Text>
-            <Text style={styles.formTitle} numberOfLines={1}>{formTitle}</Text>
+            {schema ? (
+              <Text style={styles.formTitle} numberOfLines={1}>{formTitle}</Text>
+            ) : (
+              <Text style={styles.formTitleEmpty}>No form loaded</Text>
+            )}
           </View>
-          <MaterialIcons name="settings" size={22} color="#3f4946" />
+          <MaterialIcons name="settings" size={22} color={schema ? '#3f4946' : '#9fb3ad'} />
         </TouchableOpacity>
 
         {/* Hero card */}
-        <LinearGradient
-          colors={['#006a60', '#0a8b7c', '#2f9b6e']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
+        <Swipeable
+          ref={heroSwipeRef}
+          renderLeftActions={renderHeroLeftActions}
+          renderRightActions={renderHeroRightActions}
+          overshootLeft={false}
+          overshootRight={false}
+          friction={2}
         >
-          <View style={styles.heroBubble1} />
-          <View style={styles.heroBubble2} />
-          <Text style={styles.heroLabel}>Total entries collected</Text>
-          <View style={styles.heroCount}>
-            <Text style={styles.heroNumber}>{total}</Text>
-            <MaterialIcons name="storage" size={26} color="rgba(255,255,255,0.85)" style={{ marginBottom: 12 }} />
-          </View>
-          <View style={styles.heroMeta}>
-            <MaterialIcons name="schedule" size={18} color="rgba(255,255,255,0.92)" />
-            <Text style={styles.heroMetaText}>{lastLabel}</Text>
-          </View>
-        </LinearGradient>
+          <LinearGradient
+            colors={['#006a60', '#0a8b7c', '#2f9b6e']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
+          >
+            <View style={styles.heroBubble1} />
+            <View style={styles.heroBubble2} />
+            <Text style={styles.heroLabel}>Total entries collected</Text>
+            <View style={styles.heroCount}>
+              <Text style={styles.heroNumber}>{total}</Text>
+              <MaterialIcons name="storage" size={26} color="rgba(255,255,255,0.85)" style={{ marginBottom: 12 }} />
+            </View>
+            <View style={styles.heroMeta}>
+              <MaterialIcons name="schedule" size={18} color="rgba(255,255,255,0.92)" />
+              <Text style={styles.heroMetaText}>{lastLabel}</Text>
+            </View>
+          </LinearGradient>
+        </Swipeable>
 
-        {/* Last entries header */}
+        {/* Latest entries header */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Last entries</Text>
+          <Text style={styles.sectionTitle}>Latest entries</Text>
           <TouchableOpacity onPress={() => router.push('/entries')}>
             <Text style={styles.viewAll}>View all</Text>
           </TouchableOpacity>
@@ -216,21 +369,38 @@ export default function HomeScreen() {
         {total > 0 && (
           <View style={styles.cardList}>
             {recent.map((entry) => (
-              <EntryCard
+              <Swipeable
                 key={entry.id}
-                entry={entry}
-                onOpen={() => router.push(`/entry/${entry.id}`)}
-              />
+                ref={(ref) => {
+                  if (ref) entrySwipeRefs.current.set(entry.id, ref);
+                  else entrySwipeRefs.current.delete(entry.id);
+                }}
+                renderRightActions={(progress) => renderEntryRightActions(entry.id, progress)}
+                overshootRight={false}
+                friction={2}
+              >
+                <EntryCard
+                  entry={entry}
+                  onOpen={() => router.push(`/entry/${entry.id}`)}
+                />
+              </Swipeable>
             ))}
           </View>
         )}
-      </ScrollView>
+      </View>
 
       {/* ── FAB ── */}
       <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push('/collect')}
-        activeOpacity={0.85}
+        style={[styles.fab, !schema && styles.fabDisabled]}
+        onPress={() => {
+          if (!schema) {
+            showSnack('Load a form first to collect entries');
+            setSheet('config');
+            return;
+          }
+          router.push('/collect');
+        }}
+        activeOpacity={schema ? 0.85 : 1}
       >
         <MaterialIcons name="add" size={24} color="#fff" />
         <Text style={styles.fabText}>New entry</Text>
@@ -247,20 +417,31 @@ export default function HomeScreen() {
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Load form config</Text>
-            <Text style={styles.sheetSub}>Load a form or delete one from the saved list</Text>
+            <Text style={styles.sheetSub}>Tap to load · swipe left to save or delete</Text>
           </View>
-          <ScrollView
+          <GHScrollView
             style={styles.sheetScroll}
             contentContainerStyle={styles.sheetScrollContent}
             showsVerticalScrollIndicator={false}
           >
             {presets.length > 0 ? (
               presets.map((preset) => {
-                const isActive = schema?.formId === preset.config.formId;
+                const isActive = preset.id === activePresetId;
                 return (
-                  <View key={preset.id} style={styles.sheetItemRow}>
+                  <Swipeable
+                    key={preset.id}
+                    ref={(ref) => {
+                      if (ref) swipeFormRefs.current.set(preset.id, ref);
+                      else swipeFormRefs.current.delete(preset.id);
+                    }}
+                    renderRightActions={(progress) =>
+                      renderFormRightActions(preset, progress)
+                    }
+                    overshootRight={false}
+                    friction={2}
+                  >
                     <TouchableOpacity
-                      style={styles.sheetItem}
+                      style={[styles.sheetItem, isActive && styles.sheetItemActive]}
                       onPress={() => pickPreset(preset)}
                       activeOpacity={0.78}
                     >
@@ -273,15 +454,7 @@ export default function HomeScreen() {
                       </View>
                       {isActive && <MaterialIcons name="check-circle" size={22} color="#006a60" />}
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteFormBtn}
-                      onPress={() => deletePreset(preset.id)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <MaterialIcons name="delete" size={18} color="#fff" />
-                      <Text style={styles.deleteFormText}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
+                  </Swipeable>
                 );
               })
             ) : (
@@ -295,17 +468,16 @@ export default function HomeScreen() {
               <MaterialIcons name="folder-open" size={22} color="#3f4946" />
               <Text style={styles.sheetItemTitle}>Browse device files…</Text>
             </TouchableOpacity>
-          </ScrollView>
+          </GHScrollView>
         </View>
       )}
 
-      {/* ── Snackbar ── */}
-      {snackbar && (
-        <View style={[styles.snackbar, { bottom: 84 + insets.bottom }]}>
-          <MaterialIcons name="check-circle" size={20} color="#83d5c6" />
-          <Text style={styles.snackText}>{snackbar}</Text>
-        </View>
-      )}
+      <Toast
+        message={snackbar}
+        onDismiss={() => setSnackbar(null)}
+        bottom={84 + insets.bottom}
+        icon={snackbar?.startsWith('No forms') ? 'info-outline' : 'check-circle'}
+      />
     </View>
   );
 }
@@ -366,10 +538,9 @@ const styles = StyleSheet.create({
   },
 
   // Scroll
-  scroll: { flex: 1 },
-  scrollContent: {
+  body: {
+    flex: 1,
     padding: 16,
-    paddingBottom: 120,
     gap: 16,
   },
 
@@ -400,6 +571,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: '#171d1b',
+  },
+  formBtnEmpty: {
+    borderColor: '#c2cfca',
+    backgroundColor: '#f0f4f2',
+  },
+  formTitleEmpty: {
+    fontSize: 15,
+    fontWeight: '400',
+    color: '#9fb3ad',
+    fontStyle: 'italic',
   },
 
   // Hero
@@ -455,6 +636,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.92)',
   },
+  heroAction: {
+    width: 96,
+    alignItems: 'stretch',
+    marginVertical: 2,
+  },
+  heroActionLeft: {
+    marginRight: 8,
+  },
+  heroActionRight: {
+    marginLeft: 8,
+  },
+  heroActionBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 24,
+  },
+  heroActionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.2,
+  },
 
   // Section header
   sectionHeader: {
@@ -498,6 +703,27 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
+  deleteAction: {
+    width: 88,
+    justifyContent: 'center',
+    alignItems: 'stretch',
+    marginLeft: 6,
+  },
+  deleteBtn: {
+    flex: 1,
+    backgroundColor: '#a1161f',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  deleteLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.3,
+  },
+
   // FAB
   fab: {
     position: 'absolute',
@@ -521,6 +747,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
+  fabDisabled: {
+    backgroundColor: '#9fb3ad',
+    shadowOpacity: 0.12,
+    elevation: 3,
+  },
 
   // Scrim
   scrim: {
@@ -528,6 +759,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.42)',
     zIndex: 30,
   },
+
   // Sheet
   sheet: {
     position: 'absolute',
@@ -569,7 +801,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   sheetItem: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
@@ -577,12 +808,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginHorizontal: 8,
     borderRadius: 14,
+    backgroundColor: '#f4fbf8',
   },
-  sheetItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 8,
-    gap: 4,
+  sheetItemActive: {
+    backgroundColor: '#e6f3ef',
   },
   sheetDivider: {
     marginTop: 2,
@@ -606,23 +835,40 @@ const styles = StyleSheet.create({
     color: '#3f4946',
     marginTop: 1,
   },
-  deleteFormBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+
+  // Swipe actions
+  formActions: {
+    width: 160,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ba1a1a',
-    flexShrink: 0,
+    alignItems: 'stretch',
+    marginLeft: 6,
+    gap: 6,
+    paddingRight: 8,
+    paddingVertical: 2,
   },
-  deleteFormText: {
-    display: 'none',
-    fontSize: 12,
+  downloadFormBtn: {
+    flex: 1,
+    backgroundColor: '#006a60',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  deleteFormBtn: {
+    flex: 1,
+    backgroundColor: '#a1161f',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionLabel: {
+    fontSize: 11,
     fontWeight: '700',
     color: '#fff',
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
+
   sheetScroll: {
     flexGrow: 0,
   },
@@ -646,27 +892,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
 
-  // Snackbar
-  snackbar: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#2f3330',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-  },
-  snackText: {
-    fontSize: 14,
-    color: '#eef1ee',
-  },
 });

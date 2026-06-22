@@ -18,8 +18,9 @@ import { useFormStore } from '../store/formStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { captureLocation } from '../utils/sensors';
 import { PhotoItem } from '../types';
-import GpsField from '../components/fields/GpsField';
+import Toast from '../components/Toast';
 import DynamicForm from '../components/DynamicForm';
+import { isFieldFilled, isFieldVisible } from '../utils/formLogic';
 
 export default function CollectScreen() {
   const insets = useSafeAreaInsets();
@@ -32,7 +33,6 @@ export default function CollectScreen() {
   const [exitWarn, setExitWarn] = useState(false);
   const [photoSheet, setPhotoSheet] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const snackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showSnack = useCallback((msg: string) => {
@@ -41,39 +41,32 @@ export default function CollectScreen() {
     snackTimer.current = setTimeout(() => setSnackbar(null), 2600);
   }, []);
 
-  // Reset draft on mount and start GPS if auto
   useEffect(() => {
     resetDraft();
     const gpsField = schema?.fields.find((f) => f.type === 'gps');
-    if (gpsField?.auto) {
-      runGps();
-    }
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
+    if (gpsField?.auto) runGps();
+    schema?.fields
+      .filter((f) => f.type === 'date' && f.auto)
+      .forEach((f) => setField(f.id, new Date().toISOString()));
+    return () => { if (snackTimer.current) clearTimeout(snackTimer.current); };
   }, []);
 
-  // Android hardware back button
   useEffect(() => {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (savedFlash) return true;
-      if (isDirty()) {
-        setExitWarn(true);
-        return true;
-      }
+      if (isDirty()) { setExitWarn(true); return true; }
       return false;
     });
     return () => handler.remove();
   }, [draft, savedFlash]);
 
   const isDirty = useCallback(() => {
-    return (
-      !!draft.site_name ||
-      !!draft.category ||
-      (draft.rating ?? 0) > 0 ||
-      !!draft.notes ||
-      (draft.photo ?? []).length > 0
-    );
+    return Object.values(draft).some((v) => {
+      if (Array.isArray(v)) return v.length > 0;
+      if (typeof v === 'number') return v > 0;
+      if (typeof v === 'string') return v.trim().length > 0;
+      return !!v;
+    });
   }, [draft]);
 
   const runGps = async () => {
@@ -87,42 +80,27 @@ export default function CollectScreen() {
     }
   };
 
-  // Progress bar: count of filled required fields
-  const requiredFields = schema?.fields.filter((f) => f.required) ?? [];
-  const filledCount = requiredFields.filter((f) => {
-    const v = draft[f.id];
-    if (f.type === 'gps') return !!v;
-    if (f.type === 'rating') return (v ?? 0) > 0;
-    return !!v && String(v).trim().length > 0;
-  }).length;
-  const progress = requiredFields.length > 0 ? filledCount / requiredFields.length : 0;
-
-  const location = draft.location;
-  const coordsStr = location
-    ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
-    : '';
-  const accStr = location ? `±${location.accuracy.toFixed(1)} m` : '';
+  const requiredFields = (schema?.fields.filter((f) => f.required) ?? []).filter((f) =>
+    isFieldVisible(f, draft),
+  );
+  const filledCount = requiredFields.filter((f) => isFieldFilled(f, draft[f.id])).length;
+  const progress = requiredFields.length > 0 ? filledCount / requiredFields.length : 1;
 
   const handleSave = () => {
-    const valid =
-      draft.site_name?.trim() &&
-      draft.category &&
-      (draft.rating ?? 0) > 0 &&
-      draft.location;
+    if (savedFlash) return;
 
-    if (!valid) {
+    const hasUnfilled = requiredFields.some((f) => !isFieldFilled(f, draft[f.id]));
+
+    if (hasUnfilled) {
       setShowErrors(true);
       showSnack('Fill in all required fields');
       return;
     }
 
-    addEntry({ ...draft, site_name: draft.site_name.trim() });
+    addEntry({ ...draft }, schema!.fields, schema!.formTitle);
     setSavedFlash(true);
-    saveTimer.current = setTimeout(() => {
-      setSavedFlash(false);
-      resetDraft();
-      router.replace('/');
-    }, 1050);
+    resetDraft();
+    router.replace('/');
   };
 
   const pickImage = async (source: 'camera' | 'library') => {
@@ -132,24 +110,41 @@ export default function CollectScreen() {
         source === 'camera'
           ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
           : await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
-
       if (!result.canceled && result.assets[0]) {
-        const newPhoto: PhotoItem = {
-          id: `photo-${Date.now()}`,
-          uri: result.assets[0].uri,
-        };
+        const newPhoto: PhotoItem = { id: `photo-${Date.now()}`, uri: result.assets[0].uri };
         setField('photo', [...(draft.photo ?? []), newPhoto]);
       }
     } catch {}
   };
 
   const handleBack = () => {
-    if (isDirty()) {
-      setExitWarn(true);
-    } else {
-      router.back();
-    }
+    if (isDirty()) setExitWarn(true);
+    else router.back();
   };
+
+  if (!schema) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+            <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
+          </TouchableOpacity>
+          <Text style={styles.screenTitle}>New entry</Text>
+        </View>
+        <View style={styles.noFormState}>
+          <MaterialIcons name="file-present" size={56} color="#9fb3ad" />
+          <Text style={styles.noFormTitle}>No form loaded</Text>
+          <Text style={styles.noFormHint}>
+            Go back and load a form before collecting entries.
+          </Text>
+          <TouchableOpacity style={styles.noFormBtn} onPress={() => router.back()}>
+            <MaterialIcons name="arrow-back" size={20} color="#fff" />
+            <Text style={styles.noFormBtnText}>Back to home</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -157,72 +152,75 @@ export default function CollectScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.inner, { paddingTop: insets.top }]}>
+
         {/* Top bar */}
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+          <TouchableOpacity style={styles.iconBtn} onPress={handleBack}>
             <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
           </TouchableOpacity>
-          <Text style={styles.screenTitle}>New entry</Text>
+          <View style={styles.topCenter}>
+            <Text style={styles.screenTitle}>New entry</Text>
+            <Text style={styles.formNameSub} numberOfLines={1}>{schema.formTitle}</Text>
+          </View>
+          <View style={styles.iconBtn} />
         </View>
 
-        {/* Progress bar */}
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-        </View>
+        {/* Progress */}
+        {requiredFields.length > 0 && (
+          <View style={styles.progressRow}>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+            </View>
+            <Text style={styles.progressLabel}>
+              {filledCount}/{requiredFields.length}
+            </Text>
+          </View>
+        )}
 
-        {/* Scrollable form */}
+        {/* Form */}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* GPS banner */}
-          <GpsField
-            status={gpsStatus}
-            coords={coordsStr}
-            accuracy={accStr}
-            onCapture={runGps}
-            error={showErrors && !location}
+          <DynamicForm
+            fields={schema.fields}
+            sections={schema.sections}
+            draft={draft}
+            showErrors={showErrors}
+            onFieldChange={(id, val) => setField(id, val)}
+            onAddPhotoPress={() => setPhotoSheet(true)}
+            gpsStatus={gpsStatus}
+            onGpsCapture={runGps}
           />
-
-          {/* Dynamic fields */}
-          {schema && (
-            <DynamicForm
-              fields={schema.fields}
-              draft={draft}
-              showErrors={showErrors}
-              onFieldChange={(id, val) => setField(id, val)}
-              onAddPhotoPress={() => setPhotoSheet(true)}
-            />
-          )}
         </ScrollView>
 
-        {/* Sticky save button */}
+        {/* Save button */}
         <View style={[styles.saveBar, { paddingBottom: insets.bottom + 16 }]}>
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-            <MaterialIcons name="save" size={22} color="#fff" />
+          <TouchableOpacity
+            style={[styles.saveBtn, savedFlash && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            activeOpacity={0.85}
+            disabled={savedFlash}
+          >
+            <MaterialIcons name="check" size={22} color="#fff" />
             <Text style={styles.saveBtnText}>Save entry</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Success overlay */}
-      {savedFlash && (
-        <View style={styles.successOverlay}>
-          <View style={styles.successCircle}>
-            <MaterialIcons name="check" size={54} color="#006a60" />
-          </View>
-          <Text style={styles.successText}>Entry saved</Text>
-        </View>
-      )}
+      <Toast
+        message={savedFlash ? `Entry saved · ${schema.formTitle}` : null}
+        onDismiss={() => setSavedFlash(false)}
+        bottom={96 + insets.bottom}
+        icon="check-circle"
+      />
 
-      {/* Photo source sheet scrim */}
+      {/* Photo sheet */}
       {photoSheet && (
         <Pressable style={styles.scrim} onPress={() => setPhotoSheet(false)} />
       )}
-
-      {/* Photo source sheet */}
       {photoSheet && (
         <View style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]}>
           <View style={styles.sheetHandle} />
@@ -247,41 +245,20 @@ export default function CollectScreen() {
         </View>
       )}
 
-      {/* Snackbar */}
-      {snackbar && (
-        <View style={[styles.snackbar, { bottom: 96 + insets.bottom }]}>
-          <MaterialIcons name="error-outline" size={20} color="#ffb4ab" />
-          <Text style={styles.snackText}>{snackbar}</Text>
-        </View>
-      )}
+      <Toast
+        message={snackbar}
+        onDismiss={() => setSnackbar(null)}
+        bottom={96 + insets.bottom}
+        icon="error-outline"
+      />
 
-      {/* Exit dialog */}
-      {exitWarn && (
-        <View style={styles.dialogOverlay}>
-          <View style={styles.dialog}>
-            <MaterialIcons name="edit" size={26} color="#006a60" />
-            <Text style={styles.dialogTitle}>Discard entry?</Text>
-            <Text style={styles.dialogBody}>
-              You have unsaved changes. Leaving now will discard this entry.
-            </Text>
-            <View style={styles.dialogActions}>
-              <TouchableOpacity style={styles.dialogBtn} onPress={() => setExitWarn(false)}>
-                <Text style={styles.dialogBtnKeep}>Keep editing</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.dialogBtn}
-                onPress={() => {
-                  setExitWarn(false);
-                  resetDraft();
-                  router.back();
-                }}
-              >
-                <Text style={styles.dialogBtnDiscard}>Discard</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
+      <Toast
+        message={exitWarn ? 'Discard unsaved entry?' : null}
+        onDismiss={() => setExitWarn(false)}
+        bottom={96 + insets.bottom}
+        icon="delete-outline"
+        action={{ label: 'Discard', onPress: () => { setExitWarn(false); resetDraft(); router.back(); } }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -293,63 +270,85 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
   },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  iconBtn: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 24,
+  },
+  topCenter: {
+    flex: 1,
+    alignItems: 'center',
   },
   screenTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '500',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#171d1b',
   },
+  formNameSub: {
+    fontSize: 12,
+    color: '#3f4946',
+    marginTop: 1,
+  },
 
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
   progressTrack: {
+    flex: 1,
     height: 4,
-    backgroundColor: '#cfe5df',
+    backgroundColor: '#d3e8e2',
+    borderRadius: 2,
+    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#006a60',
-    borderTopRightRadius: 2,
-    borderBottomRightRadius: 2,
+    borderRadius: 2,
+  },
+  progressLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#006a60',
+    minWidth: 28,
+    textAlign: 'right',
   },
 
   scroll: { flex: 1 },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 104,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 110,
     gap: 20,
   },
 
   saveBar: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: 16,
+    right: 16,
     bottom: 0,
-    paddingTop: 14,
-    paddingHorizontal: 16,
-    backgroundColor: 'transparent',
+    paddingTop: 10,
   },
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    padding: 16,
+    paddingVertical: 16,
     borderRadius: 18,
     backgroundColor: '#006a60',
     shadowColor: '#004840',
-    shadowOpacity: 0.32,
+    shadowOpacity: 0.28,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
   saveBtnText: {
@@ -357,31 +356,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
+  saveBtnDisabled: {
+    backgroundColor: '#7aada7',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
 
-  successOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 50,
-    backgroundColor: 'rgba(244,251,248,0.94)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-  },
-  successCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#cce8e1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  successText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#171d1b',
-  },
 
   scrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.42)',
     zIndex: 30,
   },
@@ -426,56 +409,25 @@ const styles = StyleSheet.create({
   },
   sheetItemText: { fontSize: 15, fontWeight: '500', color: '#171d1b' },
 
-  dialogOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 33,
+
+  noFormState: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 28,
-    backgroundColor: 'rgba(0,0,0,0.42)',
+    paddingHorizontal: 36,
+    gap: 12,
   },
-  dialog: {
-    backgroundColor: '#eef5f1',
-    borderRadius: 28,
-    padding: 24,
-    width: '100%',
-    maxWidth: 320,
-  },
-  dialogTitle: {
-    fontSize: 20,
-    fontWeight: '500',
-    color: '#171d1b',
-    marginTop: 14,
-  },
-  dialogBody: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: '#3f4946',
-    marginTop: 10,
-  },
-  dialogActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 6,
-    marginTop: 22,
-  },
-  dialogBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 100 },
-  dialogBtnKeep: { fontSize: 14, fontWeight: '600', color: '#006a60' },
-  dialogBtnDiscard: { fontSize: 14, fontWeight: '600', color: '#ba1a1a' },
-
-  snackbar: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 40,
+  noFormTitle: { fontSize: 20, fontWeight: '600', color: '#171d1b', marginTop: 4 },
+  noFormHint: { fontSize: 14, color: '#3f4946', textAlign: 'center', lineHeight: 21 },
+  noFormBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#2f3330',
-    paddingHorizontal: 16,
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 22,
     paddingVertical: 14,
-    borderRadius: 12,
-    elevation: 8,
+    borderRadius: 16,
+    backgroundColor: '#006a60',
   },
-  snackText: { fontSize: 14, color: '#eef1ee', flex: 1 },
+  noFormBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 });

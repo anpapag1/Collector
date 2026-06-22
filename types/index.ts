@@ -7,8 +7,12 @@ export type FieldType =
   | 'rating'
   | 'image'
   | 'gps'
-  | 'date'
-  | 'time';
+  | 'date';
+
+export type ShowIfCondition = {
+  fieldId: string;
+  equals: string | string[];
+};
 
 export type FieldDef = {
   id: string;
@@ -20,12 +24,21 @@ export type FieldDef = {
   max?: number;
   multiple?: boolean;
   auto?: boolean;
+  allowOther?: boolean;
+  sectionId?: string;
+  showIf?: ShowIfCondition;
+};
+
+export type FormSection = {
+  id: string;
+  title: string;
 };
 
 export type FormConfig = {
   formId: string;
   formTitle: string;
   version: string;
+  sections?: FormSection[];
   fields: FieldDef[];
 };
 
@@ -40,11 +53,21 @@ export type PhotoItem = {
   uri: string;
 };
 
+// Stored shape for a select option that is the "Other" choice with free text.
+export type OtherValue = {
+  value: 'Other';
+  otherText: string;
+};
+
+export type SelectValue = string | OtherValue;
+
 export type EntryData = Record<string, any>;
 
 export type Entry = {
   id: string;
   seq: number;
   createdAt: number;
+  formTitle?: string;
+  fields?: FieldDef[];
   data: EntryData;
 };

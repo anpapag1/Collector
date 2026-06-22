@@ -1,0 +1,308 @@
+{
+  "formId": "erwtimatologio-simiou",
+  "formTitle": "Ερωτηματολόγιο Σημείου Προσβασιμότητας",
+  "version": "1.0",
+  "sections": [
+    { "id": "A", "title": "ΤΜΗΜΑ Α — Γενικά στοιχεία σημείου" },
+    { "id": "B", "title": "ΤΜΗΜΑ Β — Κτίριο / Δημόσιος χώρος" },
+    { "id": "G", "title": "ΤΜΗΜΑ Γ — Θέση στάθμευσης ΑμεΑ" },
+    { "id": "E", "title": "ΤΜΗΜΑ Ε — Άλλο σημείο" }
+  ],
+  "fields": [
+    {
+      "id": "recordedDate",
+      "label": "Ημερομηνία καταγραφής",
+      "type": "date",
+      "required": true,
+      "auto": true,
+      "sectionId": "A"
+    },
+    {
+      "id": "placeName",
+      "label": "Ονομασία χώρου / σημείου",
+      "type": "text",
+      "required": true,
+      "placeholder": "π.χ. Δημαρχείο, ΚΕΠ, ΚΑΠΗ, Πλατεία, Θέση Στάθμευσης ΑμεΑ κ.λπ.",
+      "sectionId": "A"
+    },
+    {
+      "id": "address",
+      "label": "Διεύθυνση / Τοπόσημο",
+      "type": "text",
+      "required": false,
+      "placeholder": "Διεύθυνση ή τοπόσημο…",
+      "sectionId": "A"
+    },
+    {
+      "id": "location",
+      "label": "Γεωγραφικό στίγμα (GPS)",
+      "type": "gps",
+      "required": true,
+      "auto": false,
+      "sectionId": "A"
+    },
+    {
+      "id": "category",
+      "label": "Κατηγορία σημείου",
+      "type": "select",
+      "required": true,
+      "sectionId": "A",
+      "options": [
+        "Κτίριο",
+        "Δημόσιος / κοινόχρηστος χώρος",
+        "Θέση Στάθμευσης ΑμεΑ",
+        "Άλλο"
+      ]
+    },
+
+    {
+      "id": "b1_access_to_entrance",
+      "label": "Β1. Υπάρχει δυνατότητα πρόσβασης ΑμεΑ μέχρι την είσοδο του χώρου;",
+      "type": "select",
+      "required": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": ["Ναι", "Μερικώς", "Όχι", "Δεν εφαρμόζεται"]
+    },
+    {
+      "id": "b2_movement_within",
+      "label": "Β2. Υπάρχει δυνατότητα κίνησης / εξυπηρέτησης ΑμεΑ εντός του χώρου;",
+      "type": "select",
+      "required": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": ["Ναι", "Μερικώς", "Όχι", "Δεν εφαρμόζεται"]
+    },
+    {
+      "id": "b3_access_infrastructure",
+      "label": "Β3. Τι είδους υποδομή πρόσβασης υπάρχει;",
+      "type": "select",
+      "required": false,
+      "multiple": true,
+      "allowOther": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": [
+        "Ράμπα εισόδου / εξόδου",
+        "Ασανσέρ",
+        "Αναβατόριο",
+        "Οδηγός τυφλών / όδευση τυφλών",
+        "Προσβάσιμη είσοδος χωρίς υψομετρική διαφορά",
+        "Προσβάσιμος διάδρομος κυκλοφορίας"
+      ]
+    },
+    {
+      "id": "b4_height_differences",
+      "label": "Β4. Υπάρχουν υψομετρικές διαφορές που επηρεάζουν την πρόσβαση;",
+      "type": "select",
+      "required": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": [
+        "Όχι",
+        "Ναι — εξυπηρετούνται επαρκώς",
+        "Ναι — εξυπηρετούνται μερικώς",
+        "Ναι — δεν εξυπηρετούνται"
+      ]
+    },
+    {
+      "id": "b4b_height_difference_solution",
+      "label": "Τρόπος εξυπηρέτησης υψομετρικών διαφορών",
+      "type": "select",
+      "required": false,
+      "multiple": true,
+      "allowOther": true,
+      "sectionId": "B",
+      "showIf": {
+        "fieldId": "b4_height_differences",
+        "equals": ["Ναι — εξυπηρετούνται επαρκώς", "Ναι — εξυπηρετούνται μερικώς", "Ναι — δεν εξυπηρετούνται"]
+      },
+      "options": ["Ράμπα", "Ασανσέρ", "Αναβατόριο", "Δεν εφαρμόζεται"]
+    },
+    {
+      "id": "b5_infra_condition",
+      "label": "Β5. Κατάσταση υποδομών προσβασιμότητας",
+      "type": "select",
+      "required": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": [
+        "Άρτια — λειτουργούν πλήρως",
+        "Ελαφρώς φθαρμένες — λειτουργούν με μικρά προβλήματα",
+        "Ελαττωματικές — δυσλειτουργούν ή είναι επικίνδυνες",
+        "Εκτός λειτουργίας",
+        "Δεν εφαρμόζεται"
+      ]
+    },
+    {
+      "id": "b6_turning_space",
+      "label": "Β6. Υπάρχει ελεύθερος χώρος διαμέτρου περίπου 1,50 μ. για περιστροφή αμαξιδίου;",
+      "type": "select",
+      "required": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": ["Ναι", "Μερικώς", "Όχι", "Δεν εφαρμόζεται"]
+    },
+    {
+      "id": "b7_corridors",
+      "label": "Β7. Οι διάδρομοι κυκλοφορίας είναι κατάλληλοι για κίνηση ΑμεΑ;",
+      "type": "select",
+      "required": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": [
+        "Ναι — επαρκείς",
+        "Μερικώς — οριακοί / με μικρά εμπόδια",
+        "Όχι — ανεπαρκείς / με σημαντικά εμπόδια",
+        "Δεν εφαρμόζεται"
+      ]
+    },
+    {
+      "id": "b8_toilets",
+      "label": "Β8. Υπάρχουν προσβάσιμες τουαλέτες ΑμεΑ;",
+      "type": "select",
+      "required": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": [
+        "Ναι — λειτουργούν",
+        "Ναι — αλλά εκτός λειτουργίας / κλειστές",
+        "Όχι",
+        "Δεν εφαρμόζεται"
+      ]
+    },
+    {
+      "id": "b9_changing_rooms",
+      "label": "Β9. Υπάρχουν αποδυτήρια ΑμεΑ;",
+      "type": "select",
+      "required": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": [
+        "Ναι — λειτουργούν",
+        "Ναι — αλλά εκτός λειτουργίας / μη διαθέσιμα",
+        "Όχι",
+        "Δεν εφαρμόζεται"
+      ]
+    },
+    {
+      "id": "b10_signage",
+      "label": "Β10. Υπάρχει πληροφόρηση / σήμανση ΑμεΑ;",
+      "type": "select",
+      "required": true,
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] },
+      "options": ["Ναι — επαρκής", "Ναι — μερική / ανεπαρκής", "Όχι", "Δεν εφαρμόζεται"]
+    },
+    {
+      "id": "b10b_signage_type",
+      "label": "Είδος πληροφόρησης / σήμανσης",
+      "type": "select",
+      "required": false,
+      "multiple": true,
+      "allowOther": true,
+      "sectionId": "B",
+      "showIf": {
+        "fieldId": "b10_signage",
+        "equals": ["Ναι — επαρκής", "Ναι — μερική / ανεπαρκής"]
+      },
+      "options": [
+        "Πινακίδες / κατευθυντήρια σήμανση",
+        "Σήμανση προσβάσιμης εισόδου",
+        "Σήμανση ράμπας",
+        "Σήμανση ασανσέρ",
+        "Σήμανση WC ΑμεΑ",
+        "Braille / ανάγλυφη σήμανση",
+        "Ηχητική πληροφόρηση",
+        "Ψηφιακή πληροφόρηση / QR / εφαρμογή / ιστοσελίδα"
+      ]
+    },
+    {
+      "id": "b12_notes",
+      "label": "Β12. Παρατηρήσεις για κτίριο / δημόσιο χώρο",
+      "type": "textarea",
+      "required": false,
+      "placeholder": "Παρατηρήσεις…",
+      "sectionId": "B",
+      "showIf": { "fieldId": "category", "equals": ["Κτίριο", "Δημόσιος / κοινόχρηστος χώρος"] }
+    },
+
+    {
+      "id": "d1_horizontal_marking",
+      "label": "Δ1. Οριζόντια σήμανση θέσης ΑμεΑ στο οδόστρωμα",
+      "type": "select",
+      "required": true,
+      "sectionId": "G",
+      "showIf": { "fieldId": "category", "equals": "Θέση Στάθμευσης ΑμεΑ" },
+      "options": ["Ναι — ευδιάκριτη", "Ναι — φθαρμένη / δυσδιάκριτη", "Όχι"]
+    },
+    {
+      "id": "d1b_vertical_sign",
+      "label": "Κάθετη πινακίδα ΑΜΕΑ",
+      "type": "select",
+      "required": true,
+      "sectionId": "G",
+      "showIf": { "fieldId": "category", "equals": "Θέση Στάθμευσης ΑμεΑ" },
+      "options": ["Ναι — ευδιάκριτη", "Ναι — φθαρμένη / δυσδιάκριτη", "Όχι"]
+    },
+    {
+      "id": "d2_dimensions",
+      "label": "Δ2. Διαστάσεις θέσης (≥ 3,50 μ. πλάτος)",
+      "type": "select",
+      "required": true,
+      "sectionId": "G",
+      "showIf": { "fieldId": "category", "equals": "Θέση Στάθμευσης ΑμεΑ" },
+      "options": ["Επαρκείς", "Ανεπαρκείς", "Δεν μπόρεσα να εκτιμήσω"]
+    },
+    {
+      "id": "d3_sidewalk_connection",
+      "label": "Δ3. Υπάρχει σύνδεση με προσβάσιμο πεζοδρόμιο ή προσβάσιμη διαδρομή;",
+      "type": "select",
+      "required": true,
+      "sectionId": "G",
+      "showIf": { "fieldId": "category", "equals": "Θέση Στάθμευσης ΑμεΑ" },
+      "options": [
+        "Ναι — άμεση πρόσβαση",
+        "Υπάρχει πρόσβαση με μικρές δυσκολίες",
+        "Υπάρχει εμπόδιο, π.χ. κράσπεδο χωρίς κατεβατό",
+        "Όχι"
+      ]
+    },
+
+    {
+      "id": "e1_description",
+      "label": "Ε1. Περιγραφή σημείου",
+      "type": "textarea",
+      "required": true,
+      "placeholder": "Περιγραφή σημείου…",
+      "sectionId": "E",
+      "showIf": { "fieldId": "category", "equals": "Άλλο" }
+    },
+    {
+      "id": "e2_relation_to_accessibility",
+      "label": "Ε2. Σχέση σημείου με προσβασιμότητα ΑμεΑ",
+      "type": "textarea",
+      "required": false,
+      "placeholder": "Σχέση με προσβασιμότητα…",
+      "sectionId": "E",
+      "showIf": { "fieldId": "category", "equals": "Άλλο" }
+    },
+    {
+      "id": "e3_condition_notes",
+      "label": "Ε3. Κατάσταση και παρατηρήσεις",
+      "type": "textarea",
+      "required": false,
+      "placeholder": "Κατάσταση και παρατηρήσεις…",
+      "sectionId": "E",
+      "showIf": { "fieldId": "category", "equals": "Άλλο" }
+    },
+
+    {
+      "id": "photos",
+      "label": "Φωτογραφίες",
+      "type": "image",
+      "required": false,
+      "multiple": true
+    }
+  ]
+}

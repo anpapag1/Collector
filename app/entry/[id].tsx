@@ -1,20 +1,19 @@
-import { useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  Pressable,
   Image,
   StyleSheet,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEntriesStore } from '../../store/entriesStore';
-import { timeAgo, formatDate } from '../../utils/timeUtils';
-import { PhotoItem } from '../../types';
+import { formatDate, timeAgo } from '../../utils/timeUtils';
+import { FieldDef, PhotoItem, GpsLocation } from '../../types';
+import { selectValueLabel } from '../../utils/formLogic';
 
 export default function EntryDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -22,29 +21,35 @@ export default function EntryDetailScreen() {
   const entries = useEntriesStore((s) => s.entries);
   const deleteEntry = useEntriesStore((s) => s.deleteEntry);
 
-  const [deleteDialog, setDeleteDialog] = useState(false);
-
   const entry = entries.find((e) => e.id === id);
 
   if (!entry) {
     return (
       <View style={[styles.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ color: '#3f4946' }}>Entry not found.</Text>
+        <MaterialIcons name="inventory" size={40} color="#9fb3ad" />
+        <Text style={styles.notFound}>Entry not found</Text>
       </View>
     );
   }
 
-  const { data, seq, createdAt } = entry;
-  const name: string = data.site_name ?? '—';
-  const category: string = data.category ?? '';
-  const rating: number = data.rating ?? 0;
-  const notes: string = data.notes ?? '';
-  const photos: PhotoItem[] = data.photo ?? [];
-  const location = data.location;
+  const { data, seq, createdAt, formTitle, fields } = entry;
 
-  const confirmDelete = () => {
-    deleteEntry(entry.id);
-    router.back();
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete entry?',
+      `Entry #${String(seq).padStart(2, '0')} will be permanently removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteEntry(entry.id);
+            router.back();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -55,128 +60,195 @@ export default function EntryDetailScreen() {
           <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
         </TouchableOpacity>
         <Text style={styles.topLabel}>Entry #{String(seq).padStart(2, '0')}</Text>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => setDeleteDialog(true)}>
-          <MaterialIcons name="delete" size={23} color="#171d1b" />
+        <TouchableOpacity
+          style={[styles.iconBtn, styles.deleteBtn]}
+          onPress={handleDelete}
+        >
+          <MaterialIcons name="delete-outline" size={22} color="#ba1a1a" />
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 28 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Name & meta */}
-        <Text style={styles.name}>{name}</Text>
-        <View style={styles.metaRow}>
-          {!!category && <View style={styles.categoryChip}><Text style={styles.categoryText}>{category}</Text></View>}
-          <Text style={styles.ago}>{timeAgo(createdAt)}</Text>
-        </View>
-
-        {/* Stars */}
-        <View style={styles.starsRow}>
-          {[1, 2, 3, 4, 5].map((n) => (
-            <MaterialIcons
-              key={n}
-              name={n <= rating ? 'star' : 'star-border'}
-              size={22}
-              color={n <= rating ? '#006a60' : '#c6d0cc'}
-            />
-          ))}
-          <Text style={styles.ratingLabel}>{rating}/5</Text>
-        </View>
-
-        {/* GPS card */}
-        <View style={styles.gpsCard}>
-          <LinearGradient
-            colors={['#dfe9e5', '#cfe0da']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.mapPlaceholder}
-          >
-            <View style={styles.gridOverlay} />
-            <View style={styles.pin}>
-              <MaterialIcons name="location-on" size={40} color="#006a60" />
-            </View>
-          </LinearGradient>
-          <View style={styles.gpsBottom}>
-            <MaterialIcons name="my-location" size={20} color="#006a60" />
-            <View style={styles.gpsText}>
-              {location ? (
-                <>
-                  <Text style={styles.gpsCoords}>
-                    {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                  </Text>
-                  <Text style={styles.gpsAcc}>Accuracy ±{location.accuracy.toFixed(1)} m</Text>
-                </>
-              ) : (
-                <Text style={styles.gpsAcc}>No location captured</Text>
-              )}
-            </View>
+        {/* Header card */}
+        <View style={styles.headerCard}>
+          <View style={styles.headerTop}>
+            {formTitle ? (
+              <View style={styles.formChip}>
+                <MaterialIcons name="description" size={13} color="#006a60" />
+                <Text style={styles.formChipText}>{formTitle}</Text>
+              </View>
+            ) : null}
+            <Text style={styles.headerAgo}>{timeAgo(createdAt)}</Text>
           </View>
+          <Text style={styles.headerDate}>{formatDate(createdAt)}</Text>
         </View>
 
-        {/* Photos */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Photos ({photos.length})</Text>
-          {photos.length > 0 ? (
-            <View style={styles.photoGrid}>
-              {photos.map((ph) => (
-                <View key={ph.id} style={styles.photoTile}>
-                  <Image source={{ uri: ph.uri }} style={styles.photoImage} resizeMode="cover" />
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.noPhotos}>
-              <Text style={styles.noPhotosText}>No photos attached</Text>
-            </View>
-          )}
-        </View>
+        {/* Dynamic fields */}
+        {fields
+          ? fields.map((field) => renderField(field, data[field.id]))
+          : renderLegacyData(data)
+        }
 
-        {/* Notes */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Notes</Text>
-          <View style={styles.notesBox}>
-            <Text style={styles.notesText}>{notes || '—'}</Text>
-          </View>
-        </View>
-
-        {/* Metadata */}
-        <View style={styles.metaTable}>
-          <View style={styles.metaRow2}>
-            <Text style={styles.metaKey}>Created</Text>
-            <Text style={styles.metaVal}>{formatDate(createdAt)}</Text>
-          </View>
-          <View style={styles.metaRow2}>
-            <Text style={styles.metaKey}>Entry ID</Text>
-            <Text style={[styles.metaVal, styles.mono]}>{entry.id}</Text>
-          </View>
+        {/* Footer meta */}
+        <View style={styles.metaFooter}>
+          <Text style={styles.metaRow}>
+            <Text style={styles.metaKey}>Entry ID  </Text>
+            <Text style={styles.metaMono}>{entry.id}</Text>
+          </Text>
         </View>
       </ScrollView>
+    </View>
+  );
+}
 
-      {/* Delete dialog */}
-      {deleteDialog && (
-        <>
-          <Pressable style={styles.scrim} onPress={() => setDeleteDialog(false)} />
-          <View style={styles.dialogOverlay}>
-            <View style={styles.dialog}>
-              <MaterialIcons name="delete" size={26} color="#006a60" />
-              <Text style={styles.dialogTitle}>Delete entry?</Text>
-              <Text style={styles.dialogBody}>
-                Entry #{String(seq).padStart(2, '0')} — {name} will be permanently removed.
-              </Text>
-              <View style={styles.dialogActions}>
-                <TouchableOpacity style={styles.dialogBtn} onPress={() => setDeleteDialog(false)}>
-                  <Text style={styles.dialogBtnCancel}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.dialogBtn} onPress={confirmDelete}>
-                  <Text style={styles.dialogBtnDelete}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+function renderField(field: FieldDef, value: any) {
+  if (value === undefined || value === null) return null;
+
+  switch (field.type) {
+    case 'image':
+      return <PhotoSection key={field.id} label={field.label} photos={value ?? []} />;
+    case 'gps':
+      return <GpsSection key={field.id} location={value} />;
+    case 'rating':
+      return <RatingSection key={field.id} label={field.label} rating={value ?? 0} max={field.max ?? 5} />;
+    case 'boolean':
+      return (
+        <FieldRow key={field.id} label={field.label}>
+          <View style={[styles.boolChip, { backgroundColor: value ? '#cce8e1' : '#f2dada' }]}>
+            <Text style={[styles.boolChipText, { color: value ? '#004840' : '#7a0010' }]}>
+              {value ? 'Yes' : 'No'}
+            </Text>
           </View>
-        </>
-      )}
+        </FieldRow>
+      );
+    case 'date': {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return null;
+      return (
+        <FieldRow key={field.id} label={field.label}>
+          <Text style={styles.fieldValue}>{formatDate(d.getTime())}</Text>
+        </FieldRow>
+      );
+    }
+    case 'select': {
+      const text = Array.isArray(value)
+        ? value.map(selectValueLabel).join(', ')
+        : selectValueLabel(value);
+      if (!text.trim()) return null;
+      return (
+        <FieldRow key={field.id} label={field.label}>
+          <Text style={styles.fieldValue}>{text}</Text>
+        </FieldRow>
+      );
+    }
+    default:
+      if (!String(value).trim()) return null;
+      return (
+        <FieldRow key={field.id} label={field.label}>
+          <Text style={styles.fieldValue}>{String(value)}</Text>
+        </FieldRow>
+      );
+  }
+}
+
+function renderLegacyData(data: Record<string, any>) {
+  return Object.entries(data).map(([key, value]) => {
+    if (value === null || value === undefined) return null;
+
+    if (
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      'lat' in value &&
+      'lng' in value
+    ) {
+      return <GpsSection key={key} location={value as GpsLocation} />;
+    }
+
+    if (Array.isArray(value) && value.length > 0 && value[0]?.uri) {
+      return <PhotoSection key={key} label={prettyKey(key)} photos={value} />;
+    }
+
+    if (!String(value).trim()) return null;
+    return (
+      <FieldRow key={key} label={prettyKey(key)}>
+        <Text style={styles.fieldValue}>{String(value)}</Text>
+      </FieldRow>
+    );
+  });
+}
+
+function prettyKey(key: string) {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.fieldCard}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+function RatingSection({ label, rating, max }: { label: string; rating: number; max: number }) {
+  return (
+    <View style={styles.fieldCard}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.starsRow}>
+        {Array.from({ length: max }).map((_, i) => (
+          <MaterialIcons
+            key={i}
+            name={i < rating ? 'star' : 'star-border'}
+            size={22}
+            color={i < rating ? '#006a60' : '#c6d0cc'}
+          />
+        ))}
+        <Text style={styles.ratingNum}>{rating}/{max}</Text>
+      </View>
+    </View>
+  );
+}
+
+function GpsSection({ location }: { location: GpsLocation | undefined }) {
+  return (
+    <View style={styles.gpsCard}>
+      <View style={styles.gpsRow}>
+        <View style={styles.gpsIconCircle}>
+          <MaterialIcons name="location-on" size={20} color="#006a60" />
+        </View>
+        <View style={styles.gpsText}>
+          {location ? (
+            <>
+              <Text style={styles.gpsCoords}>
+                {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
+              </Text>
+              <Text style={styles.gpsSub}>Accuracy ±{location.accuracy.toFixed(1)} m</Text>
+            </>
+          ) : (
+            <Text style={styles.gpsSub}>No location captured</Text>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function PhotoSection({ label, photos }: { label: string; photos: PhotoItem[] }) {
+  if (!photos.length) return null;
+  return (
+    <View style={styles.fieldCard}>
+      <Text style={styles.fieldLabel}>{label} ({photos.length})</Text>
+      <View style={styles.photoGrid}>
+        {photos.map((ph) => (
+          <View key={ph.id} style={styles.photoTile}>
+            <Image source={{ uri: ph.uri }} style={styles.photoImage} resizeMode="cover" />
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -187,182 +259,176 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    gap: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
   },
   iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 24,
+  },
+  deleteBtn: {
+    backgroundColor: '#fdf2f2',
   },
   topLabel: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#3f4946',
-    paddingLeft: 4,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#171d1b',
+    textAlign: 'center',
   },
+
+  notFound: { fontSize: 15, color: '#3f4946', marginTop: 12 },
 
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 4,
-    gap: 20,
+    gap: 12,
   },
 
-  name: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#171d1b',
-    lineHeight: 32,
+  // Header card
+  headerCard: {
+    backgroundColor: '#e8f2ee',
+    borderRadius: 18,
+    padding: 16,
+    gap: 4,
   },
-  metaRow: {
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
   },
-  categoryChip: {
-    backgroundColor: '#c5e7ff',
-    paddingHorizontal: 12,
+  formChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#cce8e1',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 100,
+  },
+  formChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#004840',
+  },
+  headerAgo: {
+    fontSize: 12,
+    color: '#3f4946',
+  },
+  headerDate: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#171d1b',
+    marginTop: 4,
+  },
+
+  // Field card
+  fieldCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e6f0eb',
+    gap: 8,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: '#3f4946',
+  },
+  fieldValue: {
+    fontSize: 15,
+    color: '#171d1b',
+    lineHeight: 22,
+  },
+
+  // Bool chip
+  boolChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
     paddingVertical: 5,
     borderRadius: 100,
   },
-  categoryText: {
-    fontSize: 12,
+  boolChipText: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#0a3450',
   },
-  ago: { fontSize: 12, color: '#3f4946' },
 
+  // Rating
   starsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
   },
-  ratingLabel: {
-    fontSize: 14,
+  ratingNum: {
+    fontSize: 13,
     fontWeight: '500',
     color: '#3f4946',
-    marginLeft: 7,
+    marginLeft: 6,
   },
 
-  // GPS card
+  // GPS
   gpsCard: {
-    borderRadius: 18,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#cdded7',
     backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e6f0eb',
   },
-  mapPlaceholder: {
-    height: 120,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  gridOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderWidth: 0,
-  },
-  pin: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -20,
-    marginTop: -40,
-  },
-  gpsBottom: {
+  gpsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    paddingHorizontal: 14,
+    gap: 12,
+  },
+  gpsIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#cce8e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   gpsText: { flex: 1 },
   gpsCoords: { fontSize: 14, fontWeight: '600', color: '#171d1b' },
-  gpsAcc: { fontSize: 12, color: '#3f4946', marginTop: 1 },
+  gpsSub: { fontSize: 12, color: '#3f4946', marginTop: 2 },
 
   // Photos
-  section: { gap: 10 },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#3f4946',
-  },
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   photoTile: {
     width: '30%',
     aspectRatio: 1,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#c2d2cc',
+    backgroundColor: '#e2ebe7',
   },
   photoImage: { width: '100%', height: '100%' },
-  noPhotos: {
-    backgroundColor: '#eef5f1',
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
-  },
-  noPhotosText: { fontSize: 13, color: '#7a847f' },
 
-  // Notes
-  notesBox: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e2ebe7',
-    borderRadius: 14,
-    padding: 14,
+  // Footer
+  metaFooter: {
+    paddingHorizontal: 4,
+    paddingTop: 4,
+    gap: 4,
   },
-  notesText: { fontSize: 14, lineHeight: 21, color: '#171d1b' },
-
-  // Metadata table
-  metaTable: { gap: 6, paddingHorizontal: 2 },
-  metaRow2: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  metaRow: {
+    fontSize: 12,
   },
-  metaKey: { fontSize: 12, color: '#3f4946' },
-  metaVal: { fontSize: 12, color: '#171d1b' },
-  mono: { fontFamily: 'monospace' },
-
-  // Dialog
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.42)',
-    zIndex: 32,
+  metaKey: {
+    color: '#3f4946',
+    fontWeight: '500',
   },
-  dialogOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 33,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 28,
+  metaMono: {
+    color: '#171d1b',
+    fontFamily: 'monospace',
   },
-  dialog: {
-    backgroundColor: '#eef5f1',
-    borderRadius: 28,
-    padding: 24,
-    width: '100%',
-    maxWidth: 320,
-  },
-  dialogTitle: { fontSize: 20, fontWeight: '500', color: '#171d1b', marginTop: 14 },
-  dialogBody: { fontSize: 14, lineHeight: 21, color: '#3f4946', marginTop: 10 },
-  dialogActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 6,
-    marginTop: 22,
-  },
-  dialogBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 100 },
-  dialogBtnCancel: { fontSize: 14, fontWeight: '600', color: '#006a60' },
-  dialogBtnDelete: { fontSize: 14, fontWeight: '600', color: '#ba1a1a' },
 });

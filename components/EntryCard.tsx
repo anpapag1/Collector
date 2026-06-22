@@ -10,67 +10,93 @@ type Props = {
   showCoords?: boolean;
 };
 
-export default function EntryCard({ entry, onOpen, onDelete, showCoords }: Props) {
-  const name = entry.data.site_name ?? '—';
-  const category = entry.data.category ?? '';
-  const rating: number = entry.data.rating ?? 0;
-  const photos: any[] = entry.data.photo ?? [];
-  const location = entry.data.location;
-  const num = '#' + String(entry.seq).padStart(2, '0');
+export default function EntryCard({ entry, onOpen }: Props) {
+  const { seq, createdAt, formTitle, fields, data } = entry;
+
+  // Pull first meaningful text value as preview title
+  const previewTitle = (() => {
+    if (fields) {
+      for (const f of fields) {
+        if ((f.type === 'text' || f.type === 'textarea') && data[f.id]) {
+          const val = String(data[f.id]).trim();
+          if (val) return val;
+        }
+      }
+    } else {
+      // Legacy: scan data values
+      for (const v of Object.values(data)) {
+        if (typeof v === 'string' && v.trim()) return v.trim();
+      }
+    }
+    return null;
+  })();
+
+  // Count meaningful field types present
+  const hasGps = fields
+    ? fields.some((f) => f.type === 'gps' && data[f.id])
+    : !!(data.location?.lat);
+
+  const photoCount = (() => {
+    if (fields) {
+      const imgField = fields.find((f) => f.type === 'image');
+      return imgField ? (data[imgField.id] ?? []).length : 0;
+    }
+    return (data.photo ?? []).length;
+  })();
+
+  const hasRating = fields
+    ? fields.some((f) => f.type === 'rating' && data[f.id] > 0)
+    : (data.rating ?? 0) > 0;
+
+  const totalFields = fields ? fields.length : Object.keys(data).length;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onOpen} activeOpacity={0.75}>
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>{num}</Text>
+    <TouchableOpacity style={styles.card} onPress={onOpen} activeOpacity={0.72}>
+      {/* Left: entry number */}
+      <View style={styles.numBadge}>
+        <Text style={styles.numText}>#{String(seq).padStart(2, '0')}</Text>
       </View>
 
+      {/* Center: content */}
       <View style={styles.body}>
-        <Text style={styles.name} numberOfLines={1}>{name}</Text>
-        <View style={styles.meta}>
-          <Text style={styles.metaText}>{category}</Text>
-          {!!category && <View style={styles.dot} />}
-          <Text style={styles.metaText}>{timeAgo(entry.createdAt)}</Text>
+        <View style={styles.topRow}>
+          {formTitle ? (
+            <Text style={styles.formName} numberOfLines={1}>{formTitle}</Text>
+          ) : null}
+          <Text style={styles.ago}>{timeAgo(createdAt)}</Text>
         </View>
-        <View style={styles.row}>
-          {/* Stars */}
-          <View style={styles.stars}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <MaterialIcons
-                key={i}
-                name={i <= rating ? 'star' : 'star-border'}
-                size={15}
-                color={i <= rating ? '#006a60' : '#c6d0cc'}
-              />
-            ))}
-          </View>
-          {photos.length > 0 && (
+
+        <Text style={styles.preview} numberOfLines={1}>
+          {previewTitle ?? `Entry #${String(seq).padStart(2, '0')}`}
+        </Text>
+
+        {/* Indicators */}
+        <View style={styles.indicators}>
+          {photoCount > 0 && (
             <View style={styles.pill}>
-              <MaterialIcons name="photo-camera" size={14} color="#3f4946" />
-              <Text style={styles.pillText}>{photos.length}</Text>
+              <MaterialIcons name="photo" size={12} color="#3f4946" />
+              <Text style={styles.pillText}>{photoCount}</Text>
             </View>
           )}
-          {!!location && (
-            <MaterialIcons name="location-on" size={16} color="#006a60" />
+          {hasGps && (
+            <View style={styles.pill}>
+              <MaterialIcons name="location-on" size={12} color="#006a60" />
+              <Text style={[styles.pillText, { color: '#006a60' }]}>GPS</Text>
+            </View>
           )}
-          {showCoords && !!location && (
-            <Text style={styles.coords}>
-              {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-            </Text>
+          {hasRating && (
+            <View style={styles.pill}>
+              <MaterialIcons name="star" size={12} color="#a07a00" />
+            </View>
           )}
+          <View style={[styles.pill, styles.countPill]}>
+            <Text style={styles.countText}>{totalFields} {totalFields === 1 ? 'field' : 'fields'}</Text>
+          </View>
         </View>
       </View>
 
-      {onDelete ? (
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={onDelete}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <MaterialIcons name="delete" size={20} color="#9aa6a1" />
-        </TouchableOpacity>
-      ) : (
-        <MaterialIcons name="chevron-right" size={22} color="#9aa6a1" />
-      )}
+      {/* Right: chevron */}
+      <MaterialIcons name="chevron-right" size={20} color="#c2cfca" />
     </TouchableOpacity>
   );
 }
@@ -79,82 +105,89 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e2ebe7',
     borderRadius: 18,
-    padding: 12,
-    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#e6f0eb',
+    padding: 14,
   },
-  badge: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: '#cce8e1',
+
+  numBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#eef7f4',
+    borderWidth: 1,
+    borderColor: '#d3ece5',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  badgeText: {
-    fontSize: 13,
+  numText: {
+    fontSize: 12,
     fontWeight: '700',
-    color: '#00504a',
+    color: '#006a60',
+    letterSpacing: 0.3,
   },
+
   body: {
     flex: 1,
     minWidth: 0,
+    gap: 4,
   },
-  name: {
+
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  formName: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#3f4946',
+    letterSpacing: 0.3,
+    flex: 1,
+  },
+  ago: {
+    fontSize: 11,
+    color: '#9ab0a9',
+    flexShrink: 0,
+  },
+
+  preview: {
     fontSize: 15,
     fontWeight: '600',
     color: '#171d1b',
   },
-  meta: {
+
+  indicators: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 3,
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#3f4946',
-  },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#9aa6a1',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 6,
-  },
-  stars: {
-    flexDirection: 'row',
-    gap: 1,
+    marginTop: 2,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
+    backgroundColor: '#f0f5f3',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 100,
   },
   pillText: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '500',
     color: '#3f4946',
   },
-  coords: {
-    fontSize: 11,
-    color: '#006a60',
+  countPill: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
   },
-  deleteBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+  countText: {
+    fontSize: 11,
+    color: '#9ab0a9',
   },
 });

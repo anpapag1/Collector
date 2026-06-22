@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable, FlatList } from 'react-native-gesture-handler';
 import { useEntriesStore } from '../store/entriesStore';
 import EntryCard from '../components/EntryCard';
+import Toast from '../components/Toast';
 import type { Entry } from '../types';
 
 export default function EntriesScreen() {
@@ -108,13 +109,7 @@ export default function EntriesScreen() {
         }
       />
 
-      {/* Snackbar */}
-      {snackbar && (
-        <View style={[styles.snackbar, { bottom: 24 + insets.bottom }]}>
-          <MaterialIcons name="check-circle" size={20} color="#83d5c6" />
-          <Text style={styles.snackText}>{snackbar}</Text>
-        </View>
-      )}
+      <Toast message={snackbar} onDismiss={() => setSnackbar(null)} bottom={24 + insets.bottom} />
     </View>
   );
 }
@@ -196,19 +191,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  snackbar: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#2f3330',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    elevation: 8,
-  },
-  snackText: { fontSize: 14, color: '#eef1ee', flex: 1 },
 });

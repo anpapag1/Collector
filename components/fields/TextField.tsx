@@ -7,10 +7,15 @@ type Props = {
   value: string;
   onChange: (v: string) => void;
   error?: boolean;
+  numeric?: boolean;
 };
 
-export default function TextField({ field, value, onChange, error }: Props) {
+export default function TextField({ field, value, onChange, error, numeric }: Props) {
   const [focused, setFocused] = useState(false);
+
+  const handleChange = (text: string) => {
+    onChange(numeric ? text.replace(/[^0-9.,-]/g, '') : text);
+  };
 
   return (
     <View>
@@ -25,9 +30,10 @@ export default function TextField({ field, value, onChange, error }: Props) {
           error && styles.inputError,
         ]}
         value={value}
-        onChangeText={onChange}
+        onChangeText={handleChange}
         placeholder={field.placeholder}
         placeholderTextColor="#7a847f"
+        keyboardType={numeric ? 'numeric' : 'default'}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
       />

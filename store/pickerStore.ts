@@ -11,11 +11,13 @@ export type CustomForm = {
 type PickerState = {
   hiddenPresetIds: string[];
   customForms: CustomForm[];
+  activePresetId: string | null;
   hidePreset: (id: string) => void;
   showPreset: (id: string) => void;
   resetHiddenPresets: () => void;
-  addCustomForm: (config: FormConfig) => void;
+  addCustomForm: (config: FormConfig, importId: string) => void;
   removeCustomForm: (importId: string) => void;
+  setActivePresetId: (id: string | null) => void;
 };
 
 export const usePickerStore = create<PickerState>()(
@@ -23,6 +25,7 @@ export const usePickerStore = create<PickerState>()(
     (set) => ({
       hiddenPresetIds: [],
       customForms: [],
+      activePresetId: null,
       hidePreset: (id) =>
         set((state) => ({
           hiddenPresetIds: state.hiddenPresetIds.includes(id)
@@ -34,17 +37,17 @@ export const usePickerStore = create<PickerState>()(
           hiddenPresetIds: state.hiddenPresetIds.filter((presetId) => presetId !== id),
         })),
       resetHiddenPresets: () => set({ hiddenPresetIds: [] }),
-      addCustomForm: (config) =>
+      addCustomForm: (config, importId) =>
         set((state) => ({
-          customForms: [
-            ...state.customForms,
-            { importId: `custom-${Date.now()}-${Math.random().toString(36).slice(2)}`, config },
-          ],
+          customForms: [...state.customForms, { importId, config }],
         })),
       removeCustomForm: (importId) =>
         set((state) => ({
           customForms: state.customForms.filter((c) => c.importId !== importId),
+          activePresetId:
+            state.activePresetId === importId ? null : state.activePresetId,
         })),
+      setActivePresetId: (id) => set({ activePresetId: id }),
     }),
     {
       name: 'picker-storage',
@@ -52,6 +55,7 @@ export const usePickerStore = create<PickerState>()(
       partialize: (state) => ({
         hiddenPresetIds: state.hiddenPresetIds,
         customForms: state.customForms,
+        activePresetId: state.activePresetId,
       }),
     },
   ),

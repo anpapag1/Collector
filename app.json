@@ -13,7 +13,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#006A60",
-        "foregroundImage": "./assets/android-icon-foreground.png"
+        "foregroundImage": ".assets/android_icons/drawable-xxxhdpi/ic_notification.png`"
       },
       "package": "com.anonymous.Collector"
     },
@@ -24,7 +24,21 @@
       "expo-router",
       "expo-sharing",
       "expo-font",
-      "expo-splash-screen"
-    ]
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#006A60"
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "76925531-f658-4eab-a5ca-5b72830599cb"
+      }
+    },
+    "owner": "anpapag1"
   }
 }

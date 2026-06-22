@@ -1,7 +1,24 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import JSZip from 'jszip';
 import { Entry, FormConfig, PhotoItem } from '../types';
+import { selectValueLabel } from './formLogic';
+
+// Flattens "Other: <text>" select values (and arrays of them) into plain
+// strings so exports stay readable instead of dumping raw objects.
+function flattenSelectValues(entry: Entry, schema: FormConfig): Record<string, any> {
+  const fields = entry.fields ?? schema.fields;
+  const flattened: Record<string, any> = { ...entry.data };
+
+  for (const field of fields) {
+    if (field.type !== 'select') continue;
+    const v = flattened[field.id];
+    if (v === undefined || v === null) continue;
+    flattened[field.id] = Array.isArray(v) ? v.map(selectValueLabel).join(', ') : selectValueLabel(v);
+  }
+
+  return flattened;
+}
 
 function exportFilename(formId: string): string {
   const now = new Date();
@@ -45,7 +62,7 @@ export async function buildAndExport(
         id: entry.id,
         seq: entry.seq,
         createdAt: new Date(entry.createdAt).toISOString(),
-        data: { ...entry.data, photo: imagePaths },
+        data: { ...flattenSelectValues(entry, schema), photo: imagePaths },
       };
     })
   );

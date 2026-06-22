@@ -12,12 +12,14 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { loadBundledConfig } from '../utils/schemaLoader';
 import { useFormStore } from '../store/formStore';
+import { usePickerStore } from '../store/pickerStore';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const schema = useFormStore((s) => s.schema);
+  const hasInitialized = useFormStore((s) => s.hasInitialized);
   const loadSchema = useFormStore((s) => s.loadSchema);
+  const setActivePresetId = usePickerStore((s) => s.setActivePresetId);
 
   const [fontsLoaded] = useFonts({
     Roboto_400Regular,
@@ -27,8 +29,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded) {
-      if (!schema) {
+      if (!hasInitialized) {
         loadSchema(loadBundledConfig());
+        setActivePresetId('template');
       }
       SplashScreen.hideAsync();
     }
