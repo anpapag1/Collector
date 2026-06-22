@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -14,7 +14,7 @@ import { loadBundledConfig } from '../utils/schemaLoader';
 import { useFormStore } from '../store/formStore';
 import { usePickerStore } from '../store/pickerStore';
 
-SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.preventAutoHideAsync().catch((e) => console.warn('preventAutoHideAsync failed', e));
 
 export default function RootLayout() {
   const hasInitialized = useFormStore((s) => s.hasInitialized);
@@ -27,17 +27,26 @@ export default function RootLayout() {
     Roboto_700Bold,
   });
 
+  const [hasHydrated, setHasHydrated] = useState(useFormStore.persist.hasHydrated());
+
   useEffect(() => {
-    if (fontsLoaded) {
+    if (hasHydrated) return;
+    const unsub = useFormStore.persist.onFinishHydration(() => setHasHydrated(true));
+    if (useFormStore.persist.hasHydrated()) setHasHydrated(true);
+    return unsub;
+  }, [hasHydrated]);
+
+  useEffect(() => {
+    if (fontsLoaded && hasHydrated) {
       if (!hasInitialized) {
         loadSchema(loadBundledConfig());
         setActivePresetId('template');
       }
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, hasInitialized, loadSchema, setActivePresetId]);
+  }, [fontsLoaded, hasHydrated, hasInitialized, loadSchema, setActivePresetId]);
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded || !hasHydrated) return null;
 
   return (
     <GestureHandlerRootView style={styles.root}>

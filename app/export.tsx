@@ -27,9 +27,13 @@ export default function ExportScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
 
-  const imageFieldId = schema?.fields.find((f) => f.type === 'image')?.id;
   const photoTotal = entries.reduce((sum, e) => {
-    const fieldId = (e.fields?.find((f) => f.type === 'image')?.id) ?? imageFieldId;
+    // Entries with their own `fields` snapshot use it directly; legacy entries
+    // (no snapshot) fall back to the hardcoded 'photo' key, matching
+    // EntryCard.tsx's legacy fallback, rather than guessing using the
+    // *current* active schema's image field id (which may not match the
+    // schema the entry was actually collected under).
+    const fieldId = e.fields ? e.fields.find((f) => f.type === 'image')?.id : 'photo';
     if (!fieldId) return sum;
     return sum + ((e.data[fieldId] ?? []) as any[]).length;
   }, 0);
@@ -44,6 +48,9 @@ export default function ExportScreen() {
       spinAnim.stopAnimation();
       spinAnim.setValue(0);
     }
+    return () => {
+      spinAnim.stopAnimation();
+    };
   }, [phase]);
 
   const animateTo = (pct: number) => {

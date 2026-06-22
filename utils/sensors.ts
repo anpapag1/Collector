@@ -12,6 +12,6 @@ export async function captureLocation(): Promise<GpsLocation> {
   return {
     lat: result.coords.latitude,
     lng: result.coords.longitude,
-    accuracy: result.coords.accuracy as number,
+    accuracy: result.coords.accuracy,
   };
 }

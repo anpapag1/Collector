@@ -45,7 +45,7 @@ export type FormConfig = {
 export type GpsLocation = {
   lat: number;
   lng: number;
-  accuracy: number;
+  accuracy: number | null;
 };
 
 export type PhotoItem = {

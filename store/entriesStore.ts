@@ -40,20 +40,22 @@ type EntriesState = {
 
 export const useEntriesStore = create<EntriesState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       entries: [],
       seqCounter: 0,
       addEntry: (data, fields, formTitle) => {
-        const seq = get().seqCounter + 1;
-        const entry: Entry = {
-          id: `entry-${seq}-${Date.now()}`,
-          seq,
-          createdAt: Date.now(),
-          formTitle,
-          fields,
-          data,
-        };
-        set((s) => ({ entries: [...s.entries, entry], seqCounter: seq }));
+        set((s) => {
+          const seq = s.seqCounter + 1;
+          const entry: Entry = {
+            id: `entry-${seq}-${Date.now()}`,
+            seq,
+            createdAt: Date.now(),
+            formTitle,
+            fields,
+            data,
+          };
+          return { entries: [...s.entries, entry], seqCounter: seq };
+        });
       },
       deleteEntry: (id) => {
         set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));

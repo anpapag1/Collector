@@ -110,9 +110,21 @@ function renderField(field: FieldDef, value: any) {
 
   switch (field.type) {
     case 'image':
-      return <PhotoSection key={field.id} label={field.label} photos={value ?? []} />;
-    case 'gps':
-      return <GpsSection key={field.id} location={value} />;
+      return (
+        <PhotoSection
+          key={field.id}
+          label={field.label}
+          photos={Array.isArray(value) ? value : []}
+        />
+      );
+    case 'gps': {
+      const isValidLocation =
+        value &&
+        typeof value === 'object' &&
+        Number.isFinite(Number(value.lat)) &&
+        Number.isFinite(Number(value.lng));
+      return <GpsSection key={field.id} location={isValidLocation ? value : undefined} />;
+    }
     case 'rating':
       return <RatingSection key={field.id} label={field.label} rating={value ?? 0} max={field.max ?? 5} />;
     case 'boolean':
@@ -230,13 +242,21 @@ function GpsSection({ location }: { location: GpsLocation | undefined }) {
           {location ? (
             <>
               <Text style={styles.gpsCoords}>
-                {Number(location.lat).toFixed(5)}, {Number(location.lng).toFixed(5)}
+                {(() => {
+                  const lat = Number(location.lat);
+                  const lng = Number(location.lng);
+                  return Number.isFinite(lat) && Number.isFinite(lng)
+                    ? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+                    : 'unknown';
+                })()}
               </Text>
               <Text style={styles.gpsSub}>
                 Accuracy{' '}
                 {(() => {
                   const acc = Number(location.accuracy);
-                  return Number.isFinite(acc) ? `±${acc.toFixed(1)} m` : 'unknown';
+                  return typeof location.accuracy === 'number' && Number.isFinite(acc)
+                    ? `±${acc.toFixed(1)} m`
+                    : 'unknown';
                 })()}
               </Text>
             </>

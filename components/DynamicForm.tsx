@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useMemo } from 'react';
+import { Fragment, memo, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { FieldDef, FormSection, PhotoItem } from '../types';
 import { GpsStatus } from '../store/formStore';
@@ -49,11 +49,6 @@ function DynamicForm({
     }, []);
   }, [fields]);
 
-  const handleFieldChange = useCallback(
-    (id: string, value: any) => onFieldChange(id, value),
-    [onFieldChange],
-  );
-
   return (
     <View style={{ gap: 20 }}>
       {rows.map(({ field, showHeader }) => {
@@ -72,7 +67,7 @@ function DynamicForm({
               </View>
             )}
             {renderField(field, value, error, {
-              onFieldChange: handleFieldChange,
+              onFieldChange,
               onAddPhotoPress,
               gpsStatus,
               onGpsCapture,
@@ -173,8 +168,13 @@ function renderField(
       );
     case 'gps': {
       const loc = value;
-      const coords = loc ? `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}` : '';
-      const accuracy = loc ? `±${loc.accuracy.toFixed(1)} m` : '';
+      const lat = Number(loc?.lat);
+      const lng = Number(loc?.lng);
+      const acc = Number(loc?.accuracy);
+      const coords = loc && Number.isFinite(lat) && Number.isFinite(lng)
+        ? `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+        : '';
+      const accuracy = loc && typeof loc.accuracy === 'number' && Number.isFinite(acc) ? `±${acc.toFixed(1)} m` : '';
       return (
         <GpsField
           status={ctx.gpsStatus}

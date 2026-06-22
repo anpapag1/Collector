@@ -36,8 +36,6 @@ type FormPreset = {
 
 const INITIAL_PRESETS: FormPreset[] = [
   { id: 'template', config: loadBundledConfig() },
-  // add assets\Erwtimatologio_simiou.json to presets for testing import
-  { id: 'erwtimatologio', config: require('../assets/Erwtimatologio_simiou.json') as FormConfig },
 ];
 
 const SNACKBAR_TIMEOUT_MS = 2600;

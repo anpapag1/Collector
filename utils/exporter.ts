@@ -27,8 +27,11 @@ function exportFilename(formId: string): string {
 }
 
 function imageFieldIdFor(entry: Entry, schema: FormConfig): string | undefined {
-  const fields = entry.fields ?? schema.fields;
-  return fields.find((f) => f.type === 'image')?.id;
+  // Entries with their own `fields` snapshot use it directly; legacy entries
+  // (no snapshot) fall back to the hardcoded 'photo' key, matching
+  // app/export.tsx's photoTotal calculation, so the summary count and the
+  // actual archive contents agree.
+  return entry.fields ? entry.fields.find((f) => f.type === 'image')?.id : 'photo';
 }
 
 export async function buildAndExport(
@@ -37,7 +40,8 @@ export async function buildAndExport(
   onProgress: (pct: number) => void
 ): Promise<{ path: string; skippedPhotos: number }> {
   const zip = new JSZip();
-  const imgFolder = zip.folder('images')!;
+  const imgFolder = zip.folder('images');
+  if (!imgFolder) throw new Error('Failed to create images folder in export zip');
   const filename = exportFilename(schema.formId);
 
   // Precompute the total photo count across all entries up front so progress

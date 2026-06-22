@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { FieldDef, SelectValue } from '../../types';
+import { FieldDef, OtherValue, SelectValue } from '../../types';
 import { isOtherValue } from '../../utils/formLogic';
 
 type Props = {
@@ -19,7 +19,7 @@ function SelectField({ field, value, onChange, error }: Props) {
     ? Array.isArray(value) ? value : []
     : value ? [value as SelectValue] : [];
 
-  const otherEntry = selected.find(isOtherValue) as { value: 'Other'; otherText: string } | undefined;
+  const otherEntry = selected.find(isOtherValue) as OtherValue | undefined;
   const otherSelected = !!otherEntry;
 
   const isOptSelected = (opt: string) => selected.some((s) => !isOtherValue(s) && s === opt);

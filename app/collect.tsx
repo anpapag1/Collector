@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,7 +26,7 @@ import { isFieldFilled, isFieldVisible } from '../utils/formLogic';
 export default function CollectScreen() {
   const insets = useSafeAreaInsets();
   const schema = useFormStore((s) => s.schema);
-  const { draft, gpsStatus, setField, setGpsStatus, resetDraft, showErrors, setShowErrors } =
+  const { draft, draftFormId, gpsStatus, setField, setGpsStatus, resetDraft, showErrors, setShowErrors } =
     useFormStore();
   const addEntry = useEntriesStore((s) => s.addEntry);
 
@@ -36,6 +36,7 @@ export default function CollectScreen() {
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const snackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
+  const initializedRef = useRef(false);
 
   const showSnack = useCallback((msg: string) => {
     setSnackbar(msg);
@@ -43,39 +44,7 @@ export default function CollectScreen() {
     snackTimer.current = setTimeout(() => setSnackbar(null), 2600);
   }, []);
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    resetDraft();
-    const gpsField = schema?.fields.find((f) => f.type === 'gps');
-    if (gpsField?.auto) runGps();
-    schema?.fields
-      .filter((f) => f.type === 'date' && f.auto)
-      .forEach((f) => setField(f.id, new Date().toISOString()));
-    return () => {
-      isMountedRef.current = false;
-      if (snackTimer.current) clearTimeout(snackTimer.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (savedFlash) return true;
-      if (isDirty()) { setExitWarn(true); return true; }
-      return false;
-    });
-    return () => handler.remove();
-  }, [draft, savedFlash]);
-
-  const isDirty = useCallback(() => {
-    return Object.values(draft).some((v) => {
-      if (Array.isArray(v)) return v.length > 0;
-      if (typeof v === 'number') return true;
-      if (typeof v === 'string') return v.trim().length > 0;
-      return !!v;
-    });
-  }, [draft]);
-
-  const runGps = async () => {
+  const runGps = useCallback(async () => {
     setGpsStatus('capturing');
     try {
       const loc = await captureLocation();
@@ -86,15 +55,59 @@ export default function CollectScreen() {
       if (!isMountedRef.current) return;
       setGpsStatus('idle');
     }
-  };
+  }, [setField, setGpsStatus]);
 
-  const requiredFields = (schema?.fields.filter((f) => f.required) ?? []).filter((f) =>
-    isFieldVisible(f, draft),
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (snackTimer.current) clearTimeout(snackTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!schema || initializedRef.current) return;
+    initializedRef.current = true;
+    const hasRestoredDraft =
+      draftFormId === schema.formId &&
+      schema.fields.some((f) => isFieldFilled(f, draft[f.id]));
+    if (hasRestoredDraft) return;
+    resetDraft();
+    const gpsField = schema.fields.find((f) => f.type === 'gps');
+    if (gpsField?.auto) runGps();
+    schema.fields
+      .filter((f) => f.type === 'date' && f.auto)
+      .forEach((f) => setField(f.id, new Date().toISOString()));
+  }, [schema, draft, draftFormId, resetDraft, runGps, setField]);
+
+  const isDirty = useCallback(() => {
+    if (!schema) return false;
+    return schema.fields.some((f) => isFieldFilled(f, draft[f.id]));
+  }, [schema, draft]);
+
+  useEffect(() => {
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (savedFlash) return true;
+      if (isDirty()) { setExitWarn(true); return true; }
+      return false;
+    });
+    return () => handler.remove();
+  }, [isDirty, savedFlash]);
+
+  const requiredFields = useMemo(
+    () => (schema?.fields.filter((f) => f.required) ?? []).filter((f) => isFieldVisible(f, draft)),
+    [schema, draft],
   );
-  const filledCount = requiredFields.filter((f) => isFieldFilled(f, draft[f.id])).length;
-  const progress = requiredFields.length > 0 ? filledCount / requiredFields.length : 1;
+  const filledCount = useMemo(
+    () => requiredFields.filter((f) => isFieldFilled(f, draft[f.id])).length,
+    [requiredFields, draft],
+  );
+  const progress = useMemo(
+    () => (requiredFields.length > 0 ? filledCount / requiredFields.length : 1),
+    [requiredFields, filledCount],
+  );
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (!schema) return;
     if (savedFlash) return;
 
@@ -106,13 +119,20 @@ export default function CollectScreen() {
       return;
     }
 
-    addEntry({ ...draft }, schema.fields, schema.formTitle);
+    const visibleIds = new Set(
+      schema.fields.filter((f) => isFieldVisible(f, draft)).map((f) => f.id),
+    );
+    const filteredDraft = Object.fromEntries(
+      Object.entries(draft).filter(([key]) => visibleIds.has(key)),
+    );
+
+    addEntry(filteredDraft, schema.fields, schema.formTitle);
     setSavedFlash(true);
     resetDraft();
     router.replace('/');
-  };
+  }, [schema, savedFlash, requiredFields, draft, setShowErrors, showSnack, addEntry, resetDraft]);
 
-  const pickImage = async (source: 'camera' | 'library') => {
+  const pickImage = useCallback(async (source: 'camera' | 'library') => {
     setPhotoSheet(false);
     const imageFieldId = schema?.fields.find((f) => f.type === 'image')?.id;
     if (!imageFieldId) {
@@ -125,7 +145,7 @@ export default function CollectScreen() {
           ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
           : await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
       if (!result.canceled && result.assets[0]) {
-        const id = `photo-${Date.now()}`;
+        const id = `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const picked = new File(result.assets[0].uri);
         const dest = new File(Paths.document, `${id}.jpg`);
         picked.copy(dest);
@@ -135,12 +155,14 @@ export default function CollectScreen() {
     } catch {
       showSnack('Could not add photo');
     }
-  };
+  }, [schema, showSnack, draft, setField]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (isDirty()) setExitWarn(true);
     else router.back();
-  };
+  }, [isDirty]);
+
+  const handleFieldChange = useCallback((id: string, val: any) => setField(id, val), [setField]);
 
   if (!schema) {
     return (
@@ -209,7 +231,7 @@ export default function CollectScreen() {
             sections={schema.sections}
             draft={draft}
             showErrors={showErrors}
-            onFieldChange={(id, val) => setField(id, val)}
+            onFieldChange={handleFieldChange}
             onAddPhotoPress={() => setPhotoSheet(true)}
             gpsStatus={gpsStatus}
             onGpsCapture={runGps}

@@ -15,17 +15,17 @@ export default function Toast({ message, onDismiss, bottom = 32, icon = 'check-c
   const translateY = useRef(new Animated.Value(10)).current;
 
   useEffect(() => {
-    if (message) {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 180, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 0, duration: 150, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 6, duration: 150, useNativeDriver: true }),
-      ]).start();
-    }
+    const animation = message
+      ? Animated.parallel([
+          Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+          Animated.timing(translateY, { toValue: 0, duration: 180, useNativeDriver: true }),
+        ])
+      : Animated.parallel([
+          Animated.timing(opacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+          Animated.timing(translateY, { toValue: 6, duration: 150, useNativeDriver: true }),
+        ]);
+    animation.start();
+    return () => animation.stop();
   }, [message]);
 
   if (!message) return null;

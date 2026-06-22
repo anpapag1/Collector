@@ -13,13 +13,7 @@ const VALID_FIELD_TYPES: FieldType[] = [
   'date',
 ];
 
-export function loadBundledConfig(): FormConfig {
-  return require('../assets/form-config.json') as FormConfig;
-}
-
-export async function loadFromPath(uri: string): Promise<FormConfig> {
-  const content = await new File(uri).text();
-  const parsed = JSON.parse(content);
+function validateFormConfig(parsed: any): FormConfig {
   if (!parsed.formId || !parsed.formTitle || !parsed.fields) {
     throw new Error('Invalid form-config: missing formId, formTitle, or fields');
   }
@@ -36,6 +30,23 @@ export async function loadFromPath(uri: string): Promise<FormConfig> {
     if (!VALID_FIELD_TYPES.includes(field.type)) {
       throw new Error(`Invalid form-config: field "${field.id}" has unknown type "${field.type}"`);
     }
+    if (field.type === 'select' && (!Array.isArray(field.options) || field.options.length === 0)) {
+      throw new Error(`Invalid form-config: field "${field.id}" is type "select" but has no non-empty options array`);
+    }
+    if (field.type === 'rating' && field.max !== undefined && (typeof field.max !== 'number' || field.max <= 0)) {
+      throw new Error(`Invalid form-config: field "${field.id}" is type "rating" but has an invalid max (must be a positive number)`);
+    }
   }
   return parsed as FormConfig;
+}
+
+export function loadBundledConfig(): FormConfig {
+  const parsed = require('../assets/form-config.json');
+  return validateFormConfig(parsed);
+}
+
+export async function loadFromPath(uri: string): Promise<FormConfig> {
+  const content = await new File(uri).text();
+  const parsed = JSON.parse(content);
+  return validateFormConfig(parsed);
 }
