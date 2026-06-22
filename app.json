@@ -13,7 +13,8 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#006A60",
-        "foregroundImage": ".assets/android_icons/drawable-xxxhdpi/ic_notification.png`"
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.anonymous.Collector"
     },

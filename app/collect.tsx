@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { File, Paths } from 'expo-file-system';
 import { useFormStore } from '../store/formStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { captureLocation } from '../utils/sensors';
@@ -111,7 +112,11 @@ export default function CollectScreen() {
           ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
           : await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
       if (!result.canceled && result.assets[0]) {
-        const newPhoto: PhotoItem = { id: `photo-${Date.now()}`, uri: result.assets[0].uri };
+        const id = `photo-${Date.now()}`;
+        const picked = new File(result.assets[0].uri);
+        const dest = new File(Paths.document, `${id}.jpg`);
+        picked.copy(dest);
+        const newPhoto: PhotoItem = { id, uri: dest.uri };
         setField('photo', [...(draft.photo ?? []), newPhoto]);
       }
     } catch {}
