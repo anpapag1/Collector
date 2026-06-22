@@ -54,3 +54,6 @@ yarn-error.*
 .idea/
 .claude/
 CODE_REVIEW.md
+
+# stray generated docs
+Collector_Presentation.html
