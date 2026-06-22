@@ -13,6 +13,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { loadBundledConfig } from '../utils/schemaLoader';
 import { useFormStore } from '../store/formStore';
 import { usePickerStore } from '../store/pickerStore';
+import { useEntriesStore } from '../store/entriesStore';
 
 SplashScreen.preventAutoHideAsync().catch((e) => console.warn('preventAutoHideAsync failed', e));
 
@@ -27,20 +28,44 @@ export default function RootLayout() {
     Roboto_700Bold,
   });
 
-  const [hasHydrated, setHasHydrated] = useState(useFormStore.persist.hasHydrated());
+  const [hasHydrated, setHasHydrated] = useState(
+    useFormStore.persist.hasHydrated() &&
+      useEntriesStore.persist.hasHydrated() &&
+      usePickerStore.persist.hasHydrated()
+  );
 
   useEffect(() => {
     if (hasHydrated) return;
-    const unsub = useFormStore.persist.onFinishHydration(() => setHasHydrated(true));
-    if (useFormStore.persist.hasHydrated()) setHasHydrated(true);
-    return unsub;
+    const checkAllHydrated = () => {
+      if (
+        useFormStore.persist.hasHydrated() &&
+        useEntriesStore.persist.hasHydrated() &&
+        usePickerStore.persist.hasHydrated()
+      ) {
+        setHasHydrated(true);
+      }
+    };
+    const unsubForm = useFormStore.persist.onFinishHydration(checkAllHydrated);
+    const unsubEntries = useEntriesStore.persist.onFinishHydration(checkAllHydrated);
+    const unsubPicker = usePickerStore.persist.onFinishHydration(checkAllHydrated);
+    checkAllHydrated();
+    return () => {
+      unsubForm();
+      unsubEntries();
+      unsubPicker();
+    };
   }, [hasHydrated]);
 
   useEffect(() => {
     if (fontsLoaded && hasHydrated) {
       if (!hasInitialized) {
-        loadSchema(loadBundledConfig());
-        setActivePresetId('template');
+        try {
+          loadSchema(loadBundledConfig());
+          setActivePresetId('template');
+        } catch (e) {
+          console.warn('Failed to load bundled config', e);
+          useFormStore.setState({ hasInitialized: true });
+        }
       }
       SplashScreen.hideAsync();
     }

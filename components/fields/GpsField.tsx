@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GpsStatus } from '../../store/formStore';
 
@@ -11,7 +11,7 @@ type Props = {
   error?: boolean;
 };
 
-export default function GpsField({ status, coords, accuracy, onCapture, error }: Props) {
+function GpsField({ status, coords, accuracy, onCapture, error }: Props) {
   const spinAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -154,3 +154,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
+
+export default memo(GpsField);

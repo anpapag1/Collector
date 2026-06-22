@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Entry } from '../types';
@@ -10,7 +11,7 @@ type Props = {
   showCoords?: boolean;
 };
 
-export default function EntryCard({ entry, onOpen }: Props) {
+function EntryCard({ entry, onOpen }: Props) {
   const { seq, createdAt, formTitle, fields, data } = entry;
 
   // Pull first meaningful text value as preview title
@@ -34,7 +35,7 @@ export default function EntryCard({ entry, onOpen }: Props) {
   // Count meaningful field types present
   const hasGps = fields
     ? fields.some((f) => f.type === 'gps' && data[f.id])
-    : !!(data.location?.lat);
+    : typeof data.location?.lat === 'number';
 
   const photoCount = (() => {
     if (fields) {
@@ -191,3 +192,5 @@ const styles = StyleSheet.create({
     color: '#9ab0a9',
   },
 });
+
+export default memo(EntryCard);

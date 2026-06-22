@@ -1,4 +1,4 @@
-import { Fragment, memo, useMemo } from 'react';
+import { Fragment, memo, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { FieldDef, FormSection, PhotoItem } from '../types';
 import { GpsStatus } from '../store/formStore';
@@ -38,6 +38,27 @@ function DynamicForm({
     [sections],
   );
 
+  // Keep a ref to the latest onFieldChange so cached per-field callbacks
+  // below never go stale, without needing to invalidate the cache when
+  // onFieldChange's identity changes.
+  const onFieldChangeRef = useRef(onFieldChange);
+  useEffect(() => {
+    onFieldChangeRef.current = onFieldChange;
+  }, [onFieldChange]);
+
+  // Stable per-field-id onChange callbacks so memo() on field components
+  // isn't defeated by a fresh closure every render.
+  const fieldChangeHandlers = useRef<Record<string, (v: any) => void>>({});
+  const getFieldChangeHandler = useMemo(
+    () => (id: string) => {
+      if (!fieldChangeHandlers.current[id]) {
+        fieldChangeHandlers.current[id] = (v: any) => onFieldChangeRef.current(id, v);
+      }
+      return fieldChangeHandlers.current[id];
+    },
+    [],
+  );
+
   // Determine, for each field, whether it should show its section header —
   // built with reduce instead of a `let` mutated inside `.map()`.
   const rows = useMemo(() => {
@@ -67,7 +88,7 @@ function DynamicForm({
               </View>
             )}
             {renderField(field, value, error, {
-              onFieldChange,
+              getFieldChangeHandler,
               onAddPhotoPress,
               gpsStatus,
               onGpsCapture,
@@ -86,7 +107,7 @@ function renderField(
   value: any,
   error: boolean,
   ctx: {
-    onFieldChange: (id: string, value: any) => void;
+    getFieldChangeHandler: (id: string) => (value: any) => void;
     onAddPhotoPress: () => void;
     gpsStatus: GpsStatus;
     onGpsCapture?: () => void;
@@ -98,7 +119,7 @@ function renderField(
         <TextField
           field={field}
           value={value ?? ''}
-          onChange={(v) => ctx.onFieldChange(field.id, v)}
+          onChange={ctx.getFieldChangeHandler(field.id)}
           error={error}
         />
       );
@@ -107,7 +128,7 @@ function renderField(
         <TextField
           field={field}
           value={value ?? ''}
-          onChange={(v) => ctx.onFieldChange(field.id, v)}
+          onChange={ctx.getFieldChangeHandler(field.id)}
           error={error}
           numeric
         />
@@ -117,7 +138,7 @@ function renderField(
         <TextAreaField
           field={field}
           value={value ?? ''}
-          onChange={(v) => ctx.onFieldChange(field.id, v)}
+          onChange={ctx.getFieldChangeHandler(field.id)}
           error={error}
         />
       );
@@ -126,7 +147,7 @@ function renderField(
         <SelectField
           field={field}
           value={value ?? (field.multiple ? [] : '')}
-          onChange={(v) => ctx.onFieldChange(field.id, v)}
+          onChange={ctx.getFieldChangeHandler(field.id)}
           error={error}
         />
       );
@@ -135,7 +156,7 @@ function renderField(
         <RatingField
           field={field}
           value={value ?? 0}
-          onChange={(v) => ctx.onFieldChange(field.id, v)}
+          onChange={ctx.getFieldChangeHandler(field.id)}
           error={error}
         />
       );
@@ -144,7 +165,7 @@ function renderField(
         <ImageField
           field={field}
           value={value ?? []}
-          onChange={(v: PhotoItem[]) => ctx.onFieldChange(field.id, v)}
+          onChange={ctx.getFieldChangeHandler(field.id) as (v: PhotoItem[]) => void}
           onAddPress={ctx.onAddPhotoPress}
         />
       );
@@ -153,7 +174,7 @@ function renderField(
         <BooleanField
           field={field}
           value={value ?? false}
-          onChange={(v) => ctx.onFieldChange(field.id, v)}
+          onChange={ctx.getFieldChangeHandler(field.id)}
           error={error}
         />
       );
@@ -162,7 +183,7 @@ function renderField(
         <DateField
           field={field}
           value={value ?? ''}
-          onChange={(v) => ctx.onFieldChange(field.id, v)}
+          onChange={ctx.getFieldChangeHandler(field.id)}
           error={error}
         />
       );
