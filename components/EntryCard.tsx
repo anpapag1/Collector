@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Entry } from '../types';
 import { timeAgo } from '../utils/timeUtils';
+import { useAuthStore } from '../store/authStore';
 
 const SYNC_STATUS_META: Record<
   string,
@@ -63,7 +64,8 @@ function EntryCard({ entry, displayNumber, onOpen }: Props) {
 
   const totalFields = fields ? fields.length : Object.keys(data).length;
 
-  const syncMeta = entry.syncStatus ? SYNC_STATUS_META[entry.syncStatus] : null;
+  const signedIn = useAuthStore((s) => !!s.session);
+  const syncMeta = signedIn && entry.syncStatus ? SYNC_STATUS_META[entry.syncStatus] : null;
 
   const handleSyncBadgePress = () => {
     if (entry.syncStatus === 'error' && entry.syncError) {

@@ -64,7 +64,8 @@ type EntriesState = {
   entries: Entry[];
   addEntry: (data: EntryData, fields: FieldDef[], formTitle: string) => void;
   deleteEntry: (id: string) => void;
-  clearEntries: () => void;
+  clearEntries: (options?: { deleteRemote?: boolean }) => void;
+  clearLocalOnly: () => void;
   markSyncing: (id: string) => void;
   markSynced: (id: string, remoteId: string) => void;
   markSyncError: (id: string, message: string) => void;
@@ -111,11 +112,13 @@ export const useEntriesStore = create<EntriesState>()(
           }
         }
       },
-      clearEntries: () => {
+      clearEntries: ({ deleteRemote = true }: { deleteRemote?: boolean } = {}) => {
         const entries = useEntriesStore.getState().entries;
+        set({ entries: [] });
+        if (!deleteRemote) return;
+
         const remoteIds = entries.map((e) => e.remoteId).filter((id): id is string => !!id);
         const photoPaths = entries.flatMap((e) => (e.remoteId ? photoStoragePaths(e) : []));
-        set({ entries: [] });
         if (remoteIds.length > 0) {
           supabase.from('entries').delete().in('id', remoteIds).then(({ error }) => {
             if (error) console.warn('[sync] best-effort bulk remote delete failed', error);
@@ -127,6 +130,9 @@ export const useEntriesStore = create<EntriesState>()(
           });
         }
       },
+      // Used when signing out and choosing to keep the cloud copy but wipe
+      // this device — never touches Supabase, just clears the local cache.
+      clearLocalOnly: () => set({ entries: [] }),
       markSyncing: (id) => {
         set((s) => ({
           entries: s.entries.map((e) =>
