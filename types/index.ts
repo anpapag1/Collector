@@ -46,6 +46,7 @@ export type GpsLocation = {
   lat: number;
   lng: number;
   accuracy: number | null;
+  address?: string | null;
 };
 
 export type PhotoItem = {

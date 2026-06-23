@@ -52,8 +52,18 @@ async function runSync(): Promise<void> {
       }
     }
 
-    await pullRemoteEntries(userId);
-    await pullRemoteForms(userId);
+    // Each pull is independent — one failing (e.g. a single photo download
+    // erroring out) must never prevent the other from running.
+    try {
+      await pullRemoteEntries(userId);
+    } catch (err) {
+      console.warn('[sync] entries pull failed', err);
+    }
+    try {
+      await pullRemoteForms(userId);
+    } catch (err) {
+      console.warn('[sync] forms pull failed', err);
+    }
   } finally {
     isRunning = false;
     if (queuedRerun) {
@@ -151,10 +161,20 @@ async function pullRemoteEntries(userId: string): Promise<void> {
   const missing = (rows ?? []).filter((row) => !localIds.has(row.local_id));
   if (missing.length === 0) return;
 
-  const downloaded = await Promise.all(
+  const results = await Promise.allSettled(
     missing.map((row) => downloadRemoteEntry(row, userId))
   );
-  useEntriesStore.getState().mergeRemoteEntries(downloaded);
+  const downloaded: Entry[] = [];
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      downloaded.push(result.value);
+    } else {
+      console.warn('[sync] failed to pull one entry, will retry next pass', result.reason);
+    }
+  }
+  if (downloaded.length > 0) {
+    useEntriesStore.getState().mergeRemoteEntries(downloaded);
+  }
 }
 
 async function downloadRemoteEntry(

@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   Alert,
@@ -390,13 +391,6 @@ export default function HomeScreen() {
         >
           <View style={styles.heroBubble1} />
           <View style={styles.heroBubble2} />
-          <TouchableOpacity
-            style={[styles.heroAccountBtn, { top: insets.top + 18 }]}
-            onPress={() => router.push('/settings')}
-            activeOpacity={0.78}
-          >
-            <MaterialIcons name="account-circle" size={18} color="#fff" />
-          </TouchableOpacity>
           {globalSyncStatus && (
             <TouchableOpacity
               style={[styles.heroSyncBtn, { top: insets.top + 18 }]}
@@ -425,15 +419,15 @@ export default function HomeScreen() {
           )}
           <TouchableOpacity
             style={[styles.heroSettingsBtn, { top: insets.top + 18 }]}
-            onPress={() => setSheet('config')}
+            onPress={() => router.push('/settings')}
             activeOpacity={0.78}
           >
             <MaterialIcons name="settings" size={18} color="#fff" />
           </TouchableOpacity>
           <View style={styles.heroBrand}>
-            <View style={styles.heroLogoMark}>
-              <CollectorLogo width={34} height={34} />
-            </View>
+            {/* <View style={styles.heroLogoMark}> */}
+              <CollectorLogo width={100} height={100} />
+            {/* </View> */}
             <Text style={styles.heroTitle}>Collector</Text>
           </View>
         </LinearGradient>
@@ -737,22 +731,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.22)',
   },
-  heroAccountBtn: {
-    position: 'absolute',
-    left: 18,
-    top: 18,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-  },
   heroBrand: {
     alignItems: 'center',
-    gap: 8,
   },
   heroLogoMark: {
     width: 54,

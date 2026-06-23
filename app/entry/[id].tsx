@@ -412,6 +412,9 @@ function GpsSection({
       </View>
       {hasValidLocation ? (
         <>
+          {location?.address ? (
+            <Text style={styles.gpsAddress}>{location.address}</Text>
+          ) : null}
           {mapUrl && !mapFailed ? (
             <TouchableOpacity
               style={styles.mapPreview}
@@ -663,6 +666,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text.secondary,
+  },
+  gpsAddress: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text.primary,
+    marginTop: 4,
   },
   gpsSub: {
     fontSize: 12,

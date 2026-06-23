@@ -135,6 +135,9 @@ function ReadOnlyField({ field, value }: { field: { id: string; type: string; la
     return (
       <View style={styles.fieldCard}>
         <Text style={styles.fieldLabel}>{field.label}</Text>
+        {hasLocation && value?.address ? (
+          <Text style={styles.fieldValue}>{value.address}</Text>
+        ) : null}
         <Text style={styles.fieldValue}>
           {hasLocation ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'No location captured'}
         </Text>
