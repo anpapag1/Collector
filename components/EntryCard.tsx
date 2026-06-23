@@ -16,13 +16,14 @@ const SYNC_STATUS_META: Record<
 
 type Props = {
   entry: Entry;
+  displayNumber: number;
   onOpen: () => void;
   onDelete?: () => void;
   showCoords?: boolean;
 };
 
-function EntryCard({ entry, onOpen }: Props) {
-  const { seq, createdAt, formTitle, fields, data } = entry;
+function EntryCard({ entry, displayNumber, onOpen }: Props) {
+  const { createdAt, formTitle, fields, data } = entry;
 
   // Pull first meaningful text value as preview title
   const previewTitle = (() => {
@@ -49,8 +50,9 @@ function EntryCard({ entry, onOpen }: Props) {
 
   const photoCount = (() => {
     if (fields) {
-      const imgField = fields.find((f) => f.type === 'image');
-      return imgField ? (data[imgField.id] ?? []).length : 0;
+      return fields
+        .filter((f) => f.type === 'image')
+        .reduce((sum, f) => sum + (data[f.id] ?? []).length, 0);
     }
     return (data.photo ?? []).length;
   })();
@@ -73,7 +75,7 @@ function EntryCard({ entry, onOpen }: Props) {
     <TouchableOpacity style={styles.card} onPress={onOpen} activeOpacity={0.72}>
       {/* Left: entry number */}
       <View style={styles.numBadge}>
-        <Text style={styles.numText}>#{String(seq).padStart(2, '0')}</Text>
+        <Text style={styles.numText}>#{String(displayNumber).padStart(2, '0')}</Text>
       </View>
 
       {/* Center: content */}
@@ -96,7 +98,7 @@ function EntryCard({ entry, onOpen }: Props) {
         </View>
 
         <Text style={styles.preview} numberOfLines={1}>
-          {previewTitle ?? `Entry #${String(seq).padStart(2, '0')}`}
+          {previewTitle ?? `Entry #${String(displayNumber).padStart(2, '0')}`}
         </Text>
 
         {/* Indicators */}

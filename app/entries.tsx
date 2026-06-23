@@ -8,6 +8,7 @@ import { useEntriesStore } from '../store/entriesStore';
 import EntryCard from '../components/EntryCard';
 import Toast from '../components/Toast';
 import type { Entry } from '../types';
+import { getEntryDisplayNumbers } from '../utils/entryNumbering';
 
 const SWIPE_ACTION_WIDTH = 80;
 const SNACKBAR_TIMEOUT_MS = 2600;
@@ -42,6 +43,7 @@ export default function EntriesScreen() {
     () => [...entries].sort((a, b) => b.createdAt - a.createdAt),
     [entries],
   );
+  const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
 
   const renderRightActions = (id: string, progress: Animated.AnimatedInterpolation<number>) => {
     const translateX = progress.interpolate({
@@ -75,6 +77,7 @@ export default function EntriesScreen() {
     >
       <EntryCard
         entry={item}
+        displayNumber={displayNumbers.get(item.id) ?? 0}
         onOpen={() => router.push(`/entry/${item.id}`)}
         showCoords
       />

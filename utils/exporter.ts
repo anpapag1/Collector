@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import JSZip from 'jszip';
 import { Entry, FormConfig, PhotoItem } from '../types';
 import { selectValueLabel } from './formLogic';
+import { getEntryDisplayNumbers } from './entryNumbering';
 
 // Flattens "Other: <text>" select values (and arrays of them) into plain
 // strings so exports stay readable instead of dumping raw objects.
@@ -33,12 +34,14 @@ function csvExportFilename(formId: string): string {
   return `export-${formId}-${timestamp()}.csv`;
 }
 
-function imageFieldIdFor(entry: Entry, schema: FormConfig): string | undefined {
-  // Entries with their own `fields` snapshot use it directly; legacy entries
-  // (no snapshot) fall back to the hardcoded 'photo' key, matching
-  // app/export.tsx's photoTotal calculation, so the summary count and the
-  // actual archive contents agree.
-  return entry.fields ? entry.fields.find((f) => f.type === 'image')?.id : 'photo';
+function imageFieldIdsFor(entry: Entry): string[] {
+  // Entries with their own `fields` snapshot use it directly (a form can have
+  // more than one image-type field); legacy entries (no snapshot) fall back
+  // to the hardcoded 'photo' key, matching app/export.tsx's photoTotal
+  // calculation, so the summary count and the actual archive contents agree.
+  return entry.fields
+    ? entry.fields.filter((f) => f.type === 'image').map((f) => f.id)
+    : ['photo'];
 }
 
 function csvEscape(value: unknown): string {
@@ -103,42 +106,48 @@ export async function buildAndExport(
   const filename = exportFilename(schema.formId);
 
   const totalPhotos = entries.reduce((sum, entry) => {
-    const fieldId = imageFieldIdFor(entry, schema);
-    const photos: PhotoItem[] = fieldId ? (entry.data[fieldId] ?? []) : [];
-    return sum + photos.length;
+    const fieldIds = imageFieldIdsFor(entry);
+    return sum + fieldIds.reduce((s, fieldId) => s + (entry.data[fieldId]?.length ?? 0), 0);
   }, 0);
 
   let processedPhotos = 0;
   let skippedPhotos = 0;
 
+  const displayNumbers = getEntryDisplayNumbers(entries);
+
   const serialised = await Promise.all(
     entries.map(async (entry) => {
-      const fieldId = imageFieldIdFor(entry, schema);
-      const photos: PhotoItem[] = fieldId ? (entry.data[fieldId] ?? []) : [];
-      const imagePaths: string[] = [];
+      const fieldIds = imageFieldIdsFor(entry);
+      const imageData: Record<string, string[]> = {};
 
-      for (let i = 0; i < photos.length; i++) {
-        const ph = photos[i];
-        const imgName = `${entry.id}_photo_${i}.jpg`;
-        try {
-          const b64 = await FileSystem.readAsStringAsync(ph.uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          imgFolder.file(imgName, b64, { base64: true });
-          imagePaths.push(`images/${imgName}`);
-        } catch {
-          skippedPhotos++;
+      for (const fieldId of fieldIds) {
+        const photos: PhotoItem[] = entry.data[fieldId] ?? [];
+        const imagePaths: string[] = [];
+
+        for (let i = 0; i < photos.length; i++) {
+          const ph = photos[i];
+          const imgName = `${entry.id}_${fieldId}_photo_${i}.jpg`;
+          try {
+            const b64 = await FileSystem.readAsStringAsync(ph.uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            imgFolder.file(imgName, b64, { base64: true });
+            imagePaths.push(`images/${imgName}`);
+          } catch {
+            skippedPhotos++;
+          }
+          processedPhotos++;
+          if (totalPhotos > 0) {
+            onProgress(Math.round((processedPhotos / totalPhotos) * 60));
+          }
         }
-        processedPhotos++;
-        if (totalPhotos > 0) {
-          onProgress(Math.round((processedPhotos / totalPhotos) * 60));
-        }
+
+        imageData[fieldId] = imagePaths;
       }
 
-      const imageData = fieldId ? { [fieldId]: imagePaths } : {};
       return {
         id: entry.id,
-        seq: entry.seq,
+        seq: displayNumbers.get(entry.id) ?? 0,
         createdAt: new Date(entry.createdAt).toISOString(),
         data: { ...flattenSelectValues(entry, schema), ...imageData },
       };
@@ -182,12 +191,13 @@ export async function buildCsvExport(
   const filename = csvExportFilename(schema.formId);
   const fields = csvFieldsFor(entries, schema);
   const headers = ['id', 'seq', 'createdAt', 'formTitle', ...fields.map((field) => field.label)];
+  const displayNumbers = getEntryDisplayNumbers(entries);
 
   const rows = entries.map((entry, index) => {
     const data = flattenSelectValues(entry, schema);
     const row = [
       entry.id,
-      entry.seq,
+      displayNumbers.get(entry.id) ?? 0,
       new Date(entry.createdAt).toISOString(),
       entry.formTitle ?? schema.formTitle,
       ...fields.map((field) => csvValue(data[field.id])),

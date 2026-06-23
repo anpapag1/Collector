@@ -14,6 +14,8 @@ import { useEntriesStore } from '../../store/entriesStore';
 import { formatDate, timeAgo } from '../../utils/timeUtils';
 import { FieldDef, PhotoItem, GpsLocation } from '../../types';
 import { selectValueLabel } from '../../utils/formLogic';
+import { getEntryDisplayNumbers } from '../../utils/entryNumbering';
+import { useMemo } from 'react';
 
 export default function EntryDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -22,6 +24,7 @@ export default function EntryDetailScreen() {
   const deleteEntry = useEntriesStore((s) => s.deleteEntry);
 
   const entry = entries.find((e) => e.id === id);
+  const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
 
   if (!entry) {
     return (
@@ -32,12 +35,13 @@ export default function EntryDetailScreen() {
     );
   }
 
-  const { data, seq, createdAt, formTitle, fields } = entry;
+  const { data, createdAt, formTitle, fields } = entry;
+  const displayNumber = displayNumbers.get(entry.id) ?? 0;
 
   const handleDelete = () => {
     Alert.alert(
       'Delete entry?',
-      `Entry #${String(seq).padStart(2, '0')} will be permanently removed.`,
+      `Entry #${String(displayNumber).padStart(2, '0')} will be permanently removed.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -59,7 +63,7 @@ export default function EntryDetailScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
         </TouchableOpacity>
-        <Text style={styles.topLabel}>Entry #{String(seq).padStart(2, '0')}</Text>
+        <Text style={styles.topLabel}>Entry #{String(displayNumber).padStart(2, '0')}</Text>
         <TouchableOpacity
           style={[styles.iconBtn, styles.deleteBtn]}
           onPress={handleDelete}

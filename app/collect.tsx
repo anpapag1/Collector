@@ -33,6 +33,7 @@ export default function CollectScreen() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [exitWarn, setExitWarn] = useState(false);
   const [photoSheet, setPhotoSheet] = useState(false);
+  const [activePhotoFieldId, setActivePhotoFieldId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const snackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
@@ -134,7 +135,7 @@ export default function CollectScreen() {
 
   const pickImage = useCallback(async (source: 'camera' | 'library') => {
     setPhotoSheet(false);
-    const imageFieldId = schema?.fields.find((f) => f.type === 'image')?.id;
+    const imageFieldId = activePhotoFieldId;
     if (!imageFieldId) {
       showSnack('No photo field on this form');
       return;
@@ -155,7 +156,7 @@ export default function CollectScreen() {
     } catch {
       showSnack('Could not add photo');
     }
-  }, [schema, showSnack, draft, setField]);
+  }, [activePhotoFieldId, showSnack, draft, setField]);
 
   const handleBack = useCallback(() => {
     if (isDirty()) setExitWarn(true);
@@ -232,7 +233,10 @@ export default function CollectScreen() {
             draft={draft}
             showErrors={showErrors}
             onFieldChange={handleFieldChange}
-            onAddPhotoPress={() => setPhotoSheet(true)}
+            onAddPhotoPress={(fieldId) => {
+              setActivePhotoFieldId(fieldId);
+              setPhotoSheet(true);
+            }}
             gpsStatus={gpsStatus}
             onGpsCapture={runGps}
           />

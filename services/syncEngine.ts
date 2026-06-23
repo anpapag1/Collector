@@ -3,7 +3,7 @@ import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useEntriesStore } from '../store/entriesStore';
-import { Entry, PhotoItem } from '../types';
+import { Entry, EntryData, PhotoItem } from '../types';
 
 const PHOTO_UPLOAD_TIMEOUT_MS = 30_000;
 const STALE_SYNCING_MS = 2 * 60_000;
@@ -47,9 +47,11 @@ async function runSync(): Promise<void> {
         const remoteId = await syncOneEntry(entry, userId);
         markSynced(entry.id, remoteId);
       } catch (err) {
-        markSyncError(entry.id, err instanceof Error ? err.message : String(err));
+        markSyncError(entry.id, errorMessage(err));
       }
     }
+
+    await pullRemoteEntries(userId);
   } finally {
     isRunning = false;
     if (queuedRerun) {
@@ -68,7 +70,6 @@ async function syncOneEntry(entry: Entry, userId: string): Promise<string> {
       {
         local_id: entry.id,
         user_id: userId,
-        seq: entry.seq,
         form_title: entry.formTitle ?? null,
         fields: entry.fields ?? null,
         data: remoteData,
@@ -126,6 +127,106 @@ async function uploadOnePhoto(
   if (error) throw error;
 
   return { id: photo.id, path: storagePath };
+}
+
+// Symmetric to the push side: fetches every remote row for this user and
+// inserts any whose local_id isn't already present on this device — covers
+// both "signed into an account with existing data" and "another device
+// created an entry while this one was online".
+async function pullRemoteEntries(userId: string): Promise<void> {
+  const { entries } = useEntriesStore.getState();
+  const localIds = new Set(entries.map((e) => e.id));
+
+  const { data: rows, error } = await supabase
+    .from('entries')
+    .select('id, local_id, form_title, fields, data, created_at, updated_at')
+    .eq('user_id', userId);
+  if (error) {
+    console.warn('[sync] pull failed', error);
+    return;
+  }
+
+  const missing = (rows ?? []).filter((row) => !localIds.has(row.local_id));
+  if (missing.length === 0) return;
+
+  const downloaded = await Promise.all(
+    missing.map((row) => downloadRemoteEntry(row, userId))
+  );
+  useEntriesStore.getState().mergeRemoteEntries(downloaded);
+}
+
+async function downloadRemoteEntry(
+  row: {
+    id: string;
+    local_id: string;
+    form_title: string | null;
+    fields: Entry['fields'];
+    data: Record<string, any>;
+    created_at: string;
+    updated_at: string;
+  },
+  userId: string
+): Promise<Entry> {
+  const localData: EntryData = { ...row.data };
+  const imageFields = (row.fields ?? []).filter((f) => f.type === 'image');
+
+  for (const field of imageFields) {
+    const remotePhotos: { id: string; path: string }[] = row.data[field.id] ?? [];
+    if (!Array.isArray(remotePhotos) || remotePhotos.length === 0) continue;
+
+    const localPhotos = await Promise.all(
+      remotePhotos.map((p) => downloadOnePhoto(p))
+    );
+    localData[field.id] = localPhotos;
+  }
+
+  return {
+    id: row.local_id,
+    createdAt: new Date(row.created_at).getTime(),
+    formTitle: row.form_title ?? undefined,
+    fields: row.fields ?? undefined,
+    data: localData,
+    userId,
+    syncStatus: 'synced',
+    remoteId: row.id,
+    updatedAt: new Date(row.updated_at).getTime(),
+  };
+}
+
+async function downloadOnePhoto(photo: { id: string; path: string }): Promise<PhotoItem> {
+  const dest = (FileSystem.documentDirectory ?? '') + `${photo.id}.jpg`;
+
+  const { data, error } = await supabase.storage
+    .from('entry-photos')
+    .createSignedUrl(photo.path, 60);
+  if (error || !data?.signedUrl) {
+    throw error ?? new Error(`Could not get signed URL for photo ${photo.id}`);
+  }
+
+  await withTimeout(
+    FileSystem.downloadAsync(data.signedUrl, dest),
+    PHOTO_UPLOAD_TIMEOUT_MS,
+    `Downloading photo ${photo.id} timed out`
+  );
+
+  return { id: photo.id, uri: dest };
+}
+
+// Supabase errors come back as plain objects (PostgrestError/StorageError),
+// not Error instances, so `String(err)` alone yields "[object Object]".
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    const withMessage = err as { message?: unknown; error_description?: unknown };
+    if (typeof withMessage.message === 'string') return withMessage.message;
+    if (typeof withMessage.error_description === 'string') return withMessage.error_description;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      // fall through
+    }
+  }
+  return String(err);
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {

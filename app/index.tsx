@@ -22,10 +22,14 @@ import CollectorLogo from '../assets/Collector_Logo.svg';
 import { useFormStore } from '../store/formStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { usePickerStore } from '../store/pickerStore';
+import { useAuthStore } from '../store/authStore';
+import { useSyncStore } from '../store/syncStore';
 import EntryCard from '../components/EntryCard';
 import Toast from '../components/Toast';
 import { FormConfig } from '../types';
 import { loadBundledConfig, loadFromPath } from '../utils/schemaLoader';
+import { getEntryDisplayNumbers } from '../utils/entryNumbering';
+import { requestSync } from '../services/syncEngine';
 
 type FormPreset = {
   id: string;
@@ -36,6 +40,16 @@ type FormPreset = {
 const INITIAL_PRESETS: FormPreset[] = [
   { id: 'template', config: loadBundledConfig() },
 ];
+
+const GLOBAL_SYNC_META: Record<
+  'synced' | 'syncing' | 'pending' | 'error',
+  { icon: keyof typeof MaterialIcons.glyphMap; color: string }
+> = {
+  synced: { icon: 'cloud-done', color: 'rgba(255,255,255,0.55)' },
+  syncing: { icon: 'cloud-upload', color: '#fff' },
+  pending: { icon: 'cloud-queue', color: 'rgba(255,255,255,0.75)' },
+  error: { icon: 'cloud-off', color: '#ffb4ab' },
+};
 
 const SNACKBAR_TIMEOUT_MS = 2600;
 const BOTTOM_BAR_HEIGHT = 84;
@@ -57,6 +71,8 @@ export default function HomeScreen() {
   const removeCustomForm = usePickerStore((s) => s.removeCustomForm);
   const activePresetId = usePickerStore((s) => s.activePresetId);
   const setActivePresetId = usePickerStore((s) => s.setActivePresetId);
+  const session = useAuthStore((s) => s.session);
+  const isOnline = useSyncStore((s) => s.isOnline);
 
   const [sheet, setSheet] = useState<'config' | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
@@ -91,6 +107,32 @@ export default function HomeScreen() {
   );
   const recent = useMemo(() => sorted.slice(0, 3), [sorted]);
   const total = useMemo(() => entries.length, [entries]);
+  const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
+
+  const globalSyncStatus = useMemo<'synced' | 'syncing' | 'pending' | 'error' | null>(() => {
+    if (!session) return null;
+    if (entries.some((e) => e.syncStatus === 'error')) return 'error';
+    if (entries.some((e) => e.syncStatus === 'syncing')) return 'syncing';
+    if (entries.some((e) => e.syncStatus === 'pending')) return 'pending';
+    return 'synced';
+  }, [session, entries]);
+
+  const syncPulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (globalSyncStatus !== 'syncing') {
+      syncPulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(syncPulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(syncPulse, { toValue: 0, duration: 600, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [globalSyncStatus, syncPulse]);
 
   const showSnack = useCallback((msg: string) => {
     setSnackbar(msg);
@@ -310,7 +352,7 @@ export default function HomeScreen() {
           activeOpacity={0.8}
         >
           <MaterialIcons name="delete-sweep" size={21} color="#fff" />
-          <Text style={styles.actionLabel}>Delete</Text>
+          <Text style={styles.actionLabel}>Delete All</Text>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -355,6 +397,32 @@ export default function HomeScreen() {
           >
             <MaterialIcons name="account-circle" size={18} color="#fff" />
           </TouchableOpacity>
+          {globalSyncStatus && (
+            <TouchableOpacity
+              style={[styles.heroSyncBtn, { top: insets.top + 18 }]}
+              onPress={() => {
+                requestSync();
+                showSnack('Syncing…');
+              }}
+              activeOpacity={0.78}
+            >
+              <Animated.View
+                style={
+                  globalSyncStatus === 'syncing'
+                    ? {
+                        opacity: syncPulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
+                      }
+                    : undefined
+                }
+              >
+                <MaterialIcons
+                  name={GLOBAL_SYNC_META[globalSyncStatus].icon}
+                  size={16}
+                  color={GLOBAL_SYNC_META[globalSyncStatus].color}
+                />
+              </Animated.View>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.heroSettingsBtn, { top: insets.top + 18 }]}
             onPress={() => setSheet('config')}
@@ -433,6 +501,7 @@ export default function HomeScreen() {
               >
                 <EntryCard
                   entry={entry}
+                  displayNumber={displayNumbers.get(entry.id) ?? 0}
                   onOpen={() => router.push(`/entry/${entry.id}`)}
                 />
               </Swipeable>
@@ -645,6 +714,19 @@ const styles = StyleSheet.create({
   heroSettingsBtn: {
     position: 'absolute',
     right: 18,
+    top: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  heroSyncBtn: {
+    position: 'absolute',
+    right: 60,
     top: 18,
     width: 34,
     height: 34,

@@ -67,7 +67,6 @@ export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'error';
 
 export type Entry = {
   id: string;
-  seq: number;
   createdAt: number;
   formTitle?: string;
   fields?: FieldDef[];

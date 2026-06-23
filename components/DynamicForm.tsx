@@ -18,7 +18,7 @@ type Props = {
   draft: Record<string, any>;
   showErrors: boolean;
   onFieldChange: (id: string, value: any) => void;
-  onAddPhotoPress: () => void;
+  onAddPhotoPress: (fieldId: string) => void;
   gpsStatus?: GpsStatus;
   onGpsCapture?: () => void;
 };
@@ -108,7 +108,7 @@ function renderField(
   error: boolean,
   ctx: {
     getFieldChangeHandler: (id: string) => (value: any) => void;
-    onAddPhotoPress: () => void;
+    onAddPhotoPress: (fieldId: string) => void;
     gpsStatus: GpsStatus;
     onGpsCapture?: () => void;
   },
@@ -166,7 +166,7 @@ function renderField(
           field={field}
           value={value ?? []}
           onChange={ctx.getFieldChangeHandler(field.id) as (v: PhotoItem[]) => void}
-          onAddPress={ctx.onAddPhotoPress}
+          onAddPress={() => ctx.onAddPhotoPress(field.id)}
         />
       );
     case 'boolean':
