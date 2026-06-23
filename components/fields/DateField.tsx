@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#bec9c4',
+    borderColor: '#B8C9D4',
     backgroundColor: '#fff',
   },
   inputError: { borderColor: '#ba1a1a' },
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   doneButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#006a60',
+    color: '#2589C8',
   },
   autoBox: {
     flexDirection: 'row',
@@ -138,8 +138,8 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#d3e0db',
-    backgroundColor: '#eef5f1',
+    borderColor: '#D2E4EF',
+    backgroundColor: '#F1F8FD',
   },
   autoText: {
     fontSize: 15,

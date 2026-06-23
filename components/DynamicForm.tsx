@@ -217,11 +217,11 @@ const styles = StyleSheet.create({
     marginBottom: -8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#dde8e3',
+    borderTopColor: '#D8ECFA',
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#006a60',
+    color: '#2589C8',
   },
 });

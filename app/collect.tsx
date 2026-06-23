@@ -174,7 +174,7 @@ export default function CollectScreen() {
           <Text style={styles.screenTitle}>New entry</Text>
         </View>
         <View style={styles.noFormState}>
-          <MaterialIcons name="file-present" size={56} color="#9fb3ad" />
+          <MaterialIcons name="file-present" size={56} color="#8EA8B8" />
           <Text style={styles.noFormTitle}>No form loaded</Text>
           <Text style={styles.noFormHint}>
             Go back and load a form before collecting entries.
@@ -279,7 +279,7 @@ export default function CollectScreen() {
               onPress={() => pickImage(item.source)}
             >
               <View style={styles.sheetIconCircle}>
-                <MaterialIcons name={item.icon} size={22} color="#006a60" />
+                <MaterialIcons name={item.icon} size={22} color="#2589C8" />
               </View>
               <Text style={styles.sheetItemText}>{item.label}</Text>
             </TouchableOpacity>
@@ -306,7 +306,7 @@ export default function CollectScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f4fbf8' },
+  root: { flex: 1, backgroundColor: '#F7FBFE' },
   inner: { flex: 1 },
 
   topBar: {
@@ -347,19 +347,19 @@ const styles = StyleSheet.create({
   progressTrack: {
     flex: 1,
     height: 4,
-    backgroundColor: '#d3e8e2',
+    backgroundColor: '#D8ECFA',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#006a60',
+    backgroundColor: '#2589C8',
     borderRadius: 2,
   },
   progressLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#006a60',
+    color: '#2589C8',
     minWidth: 28,
     textAlign: 'right',
   },
@@ -386,8 +386,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
     borderRadius: 18,
-    backgroundColor: '#006a60',
-    shadowColor: '#004840',
+    backgroundColor: '#2589C8',
+    shadowColor: '#17689B',
     shadowOpacity: 0.28,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   saveBtnDisabled: {
-    backgroundColor: '#7aada7',
+    backgroundColor: '#62B3E5',
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 31,
-    backgroundColor: '#f4fbf8',
+    backgroundColor: '#F7FBFE',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 10,
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#c2cfca',
+    backgroundColor: '#B8C9D4',
     alignSelf: 'center',
     marginBottom: 12,
   },
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#cce8e1',
+    backgroundColor: '#EAF6FD',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: '#006a60',
+    backgroundColor: '#2589C8',
   },
   noFormBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 });

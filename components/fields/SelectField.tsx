@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#006a60',
+    color: '#2589C8',
   },
   chips: {
     flexDirection: 'row',
@@ -155,12 +155,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: '#bec9c4',
+    borderColor: '#B8C9D4',
     backgroundColor: 'transparent',
   },
   chipSelected: {
     borderColor: 'transparent',
-    backgroundColor: '#9ef2e1',
+    backgroundColor: '#BDE6FA',
   },
   chipText: {
     fontSize: 14,
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#bec9c4',
+    borderColor: '#B8C9D4',
     backgroundColor: '#fff',
     fontSize: 14,
     color: '#171d1b',

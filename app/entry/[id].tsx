@@ -26,7 +26,7 @@ export default function EntryDetailScreen() {
   if (!entry) {
     return (
       <View style={[styles.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
-        <MaterialIcons name="inventory" size={40} color="#9fb3ad" />
+        <MaterialIcons name="inventory" size={40} color="#8EA8B8" />
         <Text style={styles.notFound}>Entry not found</Text>
       </View>
     );
@@ -78,7 +78,7 @@ export default function EntryDetailScreen() {
           <View style={styles.headerTop}>
             {formTitle ? (
               <View style={styles.formChip}>
-                <MaterialIcons name="description" size={13} color="#006a60" />
+                <MaterialIcons name="description" size={13} color="#2589C8" />
                 <Text style={styles.formChipText}>{formTitle}</Text>
               </View>
             ) : null}
@@ -130,8 +130,8 @@ function renderField(field: FieldDef, value: any) {
     case 'boolean':
       return (
         <FieldRow key={field.id} label={field.label}>
-          <View style={[styles.boolChip, { backgroundColor: value ? '#cce8e1' : '#f2dada' }]}>
-            <Text style={[styles.boolChipText, { color: value ? '#004840' : '#7a0010' }]}>
+          <View style={[styles.boolChip, { backgroundColor: value ? '#EAF6FD' : '#f2dada' }]}>
+            <Text style={[styles.boolChipText, { color: value ? '#17689B' : '#7a0010' }]}>
               {value ? 'Yes' : 'No'}
             </Text>
           </View>
@@ -222,7 +222,7 @@ function RatingSection({ label, rating, max }: { label: string; rating: number; 
             key={i}
             name={i < rating ? 'star' : 'star-border'}
             size={22}
-            color={i < rating ? '#006a60' : '#c6d0cc'}
+            color={i < rating ? '#2589C8' : '#C4D1D8'}
           />
         ))}
         <Text style={styles.ratingNum}>{rating}/{max}</Text>
@@ -236,7 +236,7 @@ function GpsSection({ location }: { location: GpsLocation | undefined }) {
     <View style={styles.gpsCard}>
       <View style={styles.gpsRow}>
         <View style={styles.gpsIconCircle}>
-          <MaterialIcons name="location-on" size={20} color="#006a60" />
+          <MaterialIcons name="location-on" size={20} color="#2589C8" />
         </View>
         <View style={styles.gpsText}>
           {location ? (
@@ -286,7 +286,7 @@ function PhotoSection({ label, photos }: { label: string; photos: PhotoItem[] })
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f4fbf8' },
+  root: { flex: 1, backgroundColor: '#F7FBFE' },
 
   topBar: {
     flexDirection: 'row',
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
 
   // Header card
   headerCard: {
-    backgroundColor: '#e8f2ee',
+    backgroundColor: '#EAF6FD',
     borderRadius: 18,
     padding: 16,
     gap: 4,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#cce8e1',
+    backgroundColor: '#EAF6FD',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 100,
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   formChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#004840',
+    color: '#17689B',
   },
   headerAgo: {
     fontSize: 12,
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e6f0eb',
+    borderColor: '#E3F0F8',
     gap: 8,
   },
   fieldLabel: {
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#e6f0eb',
+    borderColor: '#E3F0F8',
   },
   gpsRow: {
     flexDirection: 'row',
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#cce8e1',
+    backgroundColor: '#EAF6FD',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#e2ebe7',
+    backgroundColor: '#E1EEF7',
   },
   photoImage: { width: '100%', height: '100%' },
 

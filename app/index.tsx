@@ -341,7 +341,7 @@ export default function HomeScreen() {
       <View style={[styles.body, { paddingBottom: insets.bottom + 104 }]}>
         {/* Hero header */}
         <LinearGradient
-          colors={['#047857', '#059669', '#10b981']}
+          colors={['#17689B', '#2589C8', '#62B3E5']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.hero, { paddingTop: insets.top + 18 }]}
@@ -379,7 +379,7 @@ export default function HomeScreen() {
             <MaterialIcons
               name={schema ? 'description' : 'file-present'}
               size={20}
-              color={schema ? '#047857' : '#9fb3ad'}
+              color={schema ? '#2589C8' : '#8EA8B8'}
             />
             <View style={styles.formBtnBody}>
               <Text style={styles.formLabel}>Active form</Text>
@@ -389,7 +389,7 @@ export default function HomeScreen() {
                 <Text style={styles.formTitleEmpty}>No form loaded</Text>
               )}
             </View>
-            <MaterialIcons name="settings" size={20} color={schema ? '#3f4946' : '#9fb3ad'} />
+            <MaterialIcons name="settings" size={20} color={schema ? '#3f4946' : '#8EA8B8'} />
           </TouchableOpacity>
         </Swipeable>
 
@@ -404,7 +404,7 @@ export default function HomeScreen() {
         {/* Empty state */}
         {total === 0 && (
           <View style={styles.empty}>
-            <MaterialIcons name="inventory" size={46} color="#9fb3ad" />
+            <MaterialIcons name="inventory" size={46} color="#8EA8B8" />
             <Text style={styles.emptyTitle}>No entries yet</Text>
             <Text style={styles.emptyHint}>Tap "New entry" to collect your first record.</Text>
           </View>
@@ -490,21 +490,21 @@ export default function HomeScreen() {
                       onPress={() => pickPreset(preset)}
                       activeOpacity={0.78}
                     >
-                      <MaterialIcons name="description" size={22} color="#047857" />
+                      <MaterialIcons name="description" size={22} color="#2589C8" />
                       <View style={styles.sheetItemBody}>
                         <Text style={styles.sheetItemTitle}>{preset.config.formTitle}</Text>
                         <Text style={styles.sheetItemSub}>
                           {preset.config.fields.length} fields
                         </Text>
                       </View>
-                      {isActive && <MaterialIcons name="check-circle" size={22} color="#047857" />}
+                      {isActive && <MaterialIcons name="check-circle" size={22} color="#2589C8" />}
                     </TouchableOpacity>
                   </Swipeable>
                 );
               })
             ) : (
               <View style={styles.emptyForms}>
-                <MaterialIcons name="delete-forever" size={34} color="#9fb3ad" />
+                <MaterialIcons name="delete-forever" size={34} color="#8EA8B8" />
                 <Text style={styles.emptyFormsTitle}>No saved forms</Text>
                 <Text style={styles.emptyFormsHint}>Use device files to load a new form config.</Text>
               </View>
@@ -530,7 +530,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#f4fbf8',
+    backgroundColor: '#F7FBFE',
   },
 
   // Scroll
@@ -546,9 +546,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#eef5f1',
+    backgroundColor: '#F1F8FD',
     borderWidth: 1,
-    borderColor: '#d3e0db',
+    borderColor: '#D2E4EF',
     borderRadius: 14,
     padding: 11,
     paddingHorizontal: 14,
@@ -570,13 +570,13 @@ const styles = StyleSheet.create({
     color: '#171d1b',
   },
   formBtnEmpty: {
-    borderColor: '#c2cfca',
-    backgroundColor: '#f0f4f2',
+    borderColor: '#B8C9D4',
+    backgroundColor: '#F3F8FC',
   },
   formTitleEmpty: {
     fontSize: 15,
     fontWeight: '400',
-    color: '#9fb3ad',
+    color: '#8EA8B8',
     fontStyle: 'italic',
   },
   activeFormAction: {
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   activeFormExportBtn: {
-    backgroundColor: '#047857',
+    backgroundColor: '#2589C8',
   },
   activeFormDeleteBtn: {
     backgroundColor: '#a1161f',
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
   viewAll: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#047857',
+    color: '#2589C8',
   },
 
   // Empty
@@ -739,9 +739,9 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 26,
     paddingVertical: 18,
-    backgroundColor: '#047857',
+    backgroundColor: '#2589C8',
     borderRadius: 20,
-    shadowColor: '#004840',
+    shadowColor: '#17689B',
     shadowOpacity: 0.42,
     shadowRadius: 13,
     shadowOffset: { width: 0, height: 12 },
@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   fabDisabled: {
-    backgroundColor: '#9fb3ad',
+    backgroundColor: '#8EA8B8',
     shadowOpacity: 0.12,
     elevation: 3,
   },
@@ -772,7 +772,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 31,
-    backgroundColor: '#f4fbf8',
+    backgroundColor: '#F7FBFE',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 10,
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#c2cfca',
+    backgroundColor: '#B8C9D4',
     alignSelf: 'center',
     marginBottom: 12,
   },
@@ -813,15 +813,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginHorizontal: 8,
     borderRadius: 14,
-    backgroundColor: '#f4fbf8',
+    backgroundColor: '#F7FBFE',
   },
   sheetItemActive: {
-    backgroundColor: '#e6f3ef',
+    backgroundColor: '#EAF6FD',
   },
   sheetDivider: {
     marginTop: 2,
     borderTopWidth: 1,
-    borderTopColor: '#e2ebe7',
+    borderTopColor: '#E1EEF7',
     borderRadius: 0,
     marginHorizontal: 0,
     paddingHorizontal: 22,
@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
   },
   downloadFormBtn: {
     flex: 1,
-    backgroundColor: '#047857',
+    backgroundColor: '#2589C8',
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',

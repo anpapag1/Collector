@@ -81,8 +81,8 @@ function EntryCard({ entry, onOpen }: Props) {
           )}
           {hasGps && (
             <View style={styles.pill}>
-              <MaterialIcons name="location-on" size={12} color="#006a60" />
-              <Text style={[styles.pillText, { color: '#006a60' }]}>GPS</Text>
+              <MaterialIcons name="location-on" size={12} color="#2589C8" />
+              <Text style={[styles.pillText, { color: '#2589C8' }]}>GPS</Text>
             </View>
           )}
           {hasRating && (
@@ -97,7 +97,7 @@ function EntryCard({ entry, onOpen }: Props) {
       </View>
 
       {/* Right: chevron */}
-      <MaterialIcons name="chevron-right" size={20} color="#c2cfca" />
+      <MaterialIcons name="chevron-right" size={20} color="#B8C9D4" />
     </TouchableOpacity>
   );
 }
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#e6f0eb',
+    borderColor: '#E3F0F8',
     padding: 14,
   },
 
@@ -118,9 +118,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#eef7f4',
+    backgroundColor: '#F1F8FD',
     borderWidth: 1,
-    borderColor: '#d3ece5',
+    borderColor: '#CFEAFA',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   numText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#006a60',
+    color: '#2589C8',
     letterSpacing: 0.3,
   },
 
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   },
   ago: {
     fontSize: 11,
-    color: '#9ab0a9',
+    color: '#8EA8B8',
     flexShrink: 0,
   },
 
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#f0f5f3',
+    backgroundColor: '#F3F8FC',
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 100,
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   countText: {
     fontSize: 11,
-    color: '#9ab0a9',
+    color: '#8EA8B8',
   },
 });
 

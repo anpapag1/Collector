@@ -108,7 +108,7 @@ export default function EntriesScreen() {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <MaterialIcons name="inventory" size={46} color="#9fb3ad" />
+            <MaterialIcons name="inventory" size={46} color="#8EA8B8" />
             <Text style={styles.emptyTitle}>No entries yet</Text>
             <Text style={styles.emptyHint}>
               Tap "New entry" on the home screen to get started.
@@ -123,7 +123,7 @@ export default function EntriesScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f4fbf8' },
+  root: { flex: 1, backgroundColor: '#F7FBFE' },
 
   topBar: {
     flexDirection: 'row',

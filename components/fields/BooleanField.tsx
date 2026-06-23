@@ -78,12 +78,12 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#bec9c4',
+    borderColor: '#B8C9D4',
     backgroundColor: '#fff',
   },
   optionActiveYes: {
-    backgroundColor: '#006a60',
-    borderColor: '#006a60',
+    backgroundColor: '#2589C8',
+    borderColor: '#2589C8',
   },
   optionActiveNo: {
     backgroundColor: '#ba1a1a',

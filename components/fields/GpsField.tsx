@@ -46,10 +46,10 @@ function GpsField({ status, coords, accuracy, onCapture, error }: Props) {
       {status === 'done' && (
         <View style={styles.row}>
           <View style={styles.doneCircle}>
-            <MaterialIcons name="location-on" size={22} color="#006a60" />
+            <MaterialIcons name="location-on" size={22} color="#2589C8" />
           </View>
           <View style={styles.textBlock}>
-            <Text style={[styles.title, { color: '#00504a' }]}>Location captured</Text>
+            <Text style={[styles.title, { color: '#17689B' }]}>Location captured</Text>
             <Text style={styles.sub}>{coords} · {accuracy}</Text>
           </View>
           <TouchableOpacity onPress={onCapture} style={styles.redoBtn}>
@@ -85,8 +85,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#d3e0db',
-    backgroundColor: '#eef5f1',
+    borderColor: '#D2E4EF',
+    backgroundColor: '#F1F8FD',
   },
   bannerError: {
     borderColor: '#ba1a1a',
@@ -101,14 +101,14 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 3,
-    borderColor: '#b6d8d0',
-    borderTopColor: '#006a60',
+    borderColor: '#B7DBF3',
+    borderTopColor: '#2589C8',
   },
   doneCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#cce8e1',
+    backgroundColor: '#EAF6FD',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -135,10 +135,10 @@ const styles = StyleSheet.create({
   redoBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#006a60',
+    color: '#2589C8',
   },
   captureBtn: {
-    backgroundColor: '#006a60',
+    backgroundColor: '#2589C8',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 100,

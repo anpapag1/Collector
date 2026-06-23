@@ -122,7 +122,7 @@ export default function ExportScreen() {
 
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <MaterialIcons name="folder-zip" size={26} color="#006a60" />
+                <MaterialIcons name="folder-zip" size={26} color="#2589C8" />
                 <View>
                   <Text style={styles.cardHeaderTitle}>Ready to export</Text>
                   <Text style={styles.cardHeaderSub}>Bundle as a single ZIP archive</Text>
@@ -166,7 +166,7 @@ export default function ExportScreen() {
               <MaterialIcons
                 name="folder-zip"
                 size={34}
-                color="#006a60"
+                color="#2589C8"
                 style={styles.spinnerIcon}
               />
             </View>
@@ -201,7 +201,7 @@ export default function ExportScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f4fbf8' },
+  root: { flex: 1, backgroundColor: '#F7FBFE' },
 
   topBar: {
     flexDirection: 'row',
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e2ebe7',
+    borderColor: '#E1EEF7',
     borderRadius: 20,
     overflow: 'hidden',
   },
@@ -255,9 +255,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 18,
-    backgroundColor: '#eef5f1',
+    backgroundColor: '#F1F8FD',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2ebe7',
+    borderBottomColor: '#E1EEF7',
   },
   cardHeaderTitle: { fontSize: 15, fontWeight: '600', color: '#171d1b' },
   cardHeaderSub: { fontSize: 12, color: '#3f4946', marginTop: 1 },
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: '#eef5f1',
+    backgroundColor: '#F1F8FD',
     borderRadius: 14,
     padding: 14,
   },
@@ -313,8 +313,8 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 48,
     borderWidth: 6,
-    borderColor: '#cfe5df',
-    borderTopColor: '#006a60',
+    borderColor: '#D8ECFA',
+    borderTopColor: '#2589C8',
   },
   spinnerIcon: {
     position: 'absolute',
@@ -333,20 +333,20 @@ const styles = StyleSheet.create({
   progressTrack: {
     width: 300,
     height: 8,
-    backgroundColor: '#cfe5df',
+    backgroundColor: '#D8ECFA',
     borderRadius: 100,
     marginTop: 22,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#006a60',
+    backgroundColor: '#2589C8',
     borderRadius: 100,
   },
   progressLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#006a60',
+    color: '#2589C8',
     marginTop: 8,
   },
 
@@ -362,8 +362,8 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 16,
     borderRadius: 18,
-    backgroundColor: '#006a60',
-    shadowColor: '#004840',
+    backgroundColor: '#2589C8',
+    shadowColor: '#17689B',
     shadowOpacity: 0.32,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 8 },
