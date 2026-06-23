@@ -3,7 +3,17 @@ import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Entry, EntryData, FieldDef, PhotoItem } from '../types';
 import { supabase } from '../lib/supabase';
-import { requestSync } from '../services/syncEngine';
+
+// Deferred (not a top-level `import`) on purpose: entriesStore.ts loads very
+// early (via formStore.ts, before any user interaction), and syncEngine.ts
+// in turn imports entriesStore/authStore/pickerStore. A static import here
+// would make Metro re-enter this module mid-load, handing those other
+// modules a partially-initialized export. Resolving it lazily, the first
+// time requestSync() is actually called, means everything has already
+// finished loading by then.
+function requestSync() {
+  require('../services/syncEngine').requestSync();
+}
 
 // Mirrors the upload path's path convention (services/syncEngine.ts) so a
 // deleted entry's photos can be found and removed from Storage too. Only
@@ -63,6 +73,7 @@ export const safeAsyncStorage: StateStorage = {
 type EntriesState = {
   entries: Entry[];
   addEntry: (data: EntryData, fields: FieldDef[], formTitle: string) => void;
+  updateEntry: (id: string, data: EntryData) => void;
   deleteEntry: (id: string) => void;
   clearEntries: (options?: { deleteRemote?: boolean }) => void;
   clearLocalOnly: () => void;
@@ -92,6 +103,17 @@ export const useEntriesStore = create<EntriesState>()(
           return { entries: [...s.entries, entry] };
         });
         // Fire-and-forget: never block the save-and-navigate flow on network activity.
+        requestSync();
+      },
+      updateEntry: (id, data) => {
+        set((s) => ({
+          entries: s.entries.map((e) =>
+            e.id === id ? { ...e, data, syncStatus: 'pending', updatedAt: Date.now() } : e
+          ),
+        }));
+        // Re-syncing an edited entry is just another upsert keyed on
+        // (user_id, local_id) — it updates the existing remote row rather
+        // than creating a new one, so no special "edit" path is needed there.
         requestSync();
       },
       deleteEntry: (id) => {
