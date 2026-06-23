@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import {
+  Pressable,
   View,
   Text,
   TouchableOpacity,
@@ -12,9 +13,15 @@ import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEntriesStore } from '../store/entriesStore';
 import { useFormStore } from '../store/formStore';
-import { buildAndExport, exportFilename } from '../utils/exporter';
+import {
+  buildAndExport,
+  buildCsvExport,
+  csvExportFilename,
+  exportFilename,
+} from '../utils/exporter';
 
 type Phase = 'summary' | 'building' | 'done';
+type ExportKind = 'zip' | 'csv';
 
 export default function ExportScreen() {
   const insets = useSafeAreaInsets();
@@ -22,6 +29,8 @@ export default function ExportScreen() {
   const schema = useFormStore((s) => s.schema);
 
   const [phase, setPhase] = useState<Phase>('summary');
+  const [exportKind, setExportKind] = useState<ExportKind>('zip');
+  const [formatMenuOpen, setFormatMenuOpen] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -37,7 +46,9 @@ export default function ExportScreen() {
     if (!fieldId) return sum;
     return sum + ((e.data[fieldId] ?? []) as any[]).length;
   }, 0);
-  const filename = schema ? exportFilename(schema.formId) : 'export.zip';
+  const zipFilename = schema ? exportFilename(schema.formId) : 'export.zip';
+  const csvFilename = schema ? csvExportFilename(schema.formId) : 'export.csv';
+  const activeFilename = exportKind === 'csv' ? csvFilename : zipFilename;
 
   useEffect(() => {
     if (phase === 'building') {
@@ -69,26 +80,36 @@ export default function ExportScreen() {
     animateTo(0);
 
     try {
-      const { path: zipPath, skippedPhotos } = await buildAndExport(entries, schema, (pct) =>
-        animateTo(pct)
-      );
-      setPhase('done');
-      if (skippedPhotos > 0) {
-        setError(
-          `${skippedPhotos} photo${skippedPhotos === 1 ? '' : 's'} could not be read and were skipped from the export.`
+      if (exportKind === 'csv') {
+        const { path: csvPath } = await buildCsvExport(entries, schema, (pct) => animateTo(pct));
+        setPhase('done');
+        await Sharing.shareAsync(csvPath, {
+          mimeType: 'text/csv',
+          dialogTitle: 'Share CSV export',
+        });
+      } else {
+        const { path: zipPath, skippedPhotos } = await buildAndExport(entries, schema, (pct) =>
+          animateTo(pct)
         );
+        setPhase('done');
+        if (skippedPhotos > 0) {
+          setError(
+            `${skippedPhotos} photo${skippedPhotos === 1 ? '' : 's'} could not be read and were skipped from the export.`
+          );
+        }
+        await Sharing.shareAsync(zipPath, {
+          mimeType: 'application/zip',
+          dialogTitle: 'Share export',
+        });
       }
-      await Sharing.shareAsync(zipPath, {
-        mimeType: 'application/zip',
-        dialogTitle: 'Share export',
-      });
+
       // Sharing.shareAsync resolves even if the user cancels the share sheet,
       // so we can't reliably tell success from cancellation here. Stay on
       // this screen and let the user navigate back themselves rather than
       // risk redirecting home when nothing was actually shared.
       setPhase('summary');
     } catch (e: any) {
-      setError(e?.message ?? 'Export failed');
+      setError(e?.message ?? `${exportKind.toUpperCase()} export failed`);
       setPhase('summary');
     }
   };
@@ -110,7 +131,7 @@ export default function ExportScreen() {
       </View>
 
       <View style={styles.body}>
-        {/* ── Summary phase ── */}
+        {/* Summary phase */}
         {(phase === 'summary') && (
           <>
             {error && (
@@ -125,38 +146,86 @@ export default function ExportScreen() {
                 <MaterialIcons name="folder-zip" size={26} color="#2589C8" />
                 <View>
                   <Text style={styles.cardHeaderTitle}>Ready to export</Text>
-                  <Text style={styles.cardHeaderSub}>Bundle as a single ZIP archive</Text>
+                  <Text style={styles.cardHeaderSub}>Choose ZIP with photos or CSV for Excel</Text>
                 </View>
               </View>
 
               {[
-                { label: 'Form', value: schema?.formTitle ?? '—' },
+                { label: 'Form', value: schema?.formTitle ?? '-' },
                 { label: 'Entries', value: String(entries.length) },
                 { label: 'Photos', value: String(photoTotal) },
-                { label: 'Format', value: 'ZIP · entries.json + /images' },
-              ].map((row, i, arr) => (
-                <View
-                  key={row.label}
-                  style={[styles.cardRow, i < arr.length - 1 && styles.cardRowBorder]}
-                >
+              ].map((row) => (
+                <View key={row.label} style={[styles.cardRow, styles.cardRowBorder]}>
                   <Text style={styles.cardRowLabel}>{row.label}</Text>
                   <Text style={styles.cardRowValue} numberOfLines={2}>{row.value}</Text>
                 </View>
               ))}
+
+              <View style={styles.formatRow}>
+                <Text style={styles.cardRowLabel}>Export format</Text>
+                <TouchableOpacity
+                  style={styles.formatSelect}
+                  onPress={() => setFormatMenuOpen((open) => !open)}
+                  activeOpacity={0.78}
+                >
+                  <MaterialIcons
+                    name={exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
+                    size={18}
+                    color="#2589C8"
+                  />
+                  <Text style={styles.formatSelectText}>
+                    {exportKind === 'csv' ? 'CSV for Excel' : 'JSON + images'}
+                  </Text>
+                  <MaterialIcons
+                    name={formatMenuOpen ? 'expand-less' : 'expand-more'}
+                    size={20}
+                    color="#3f4946"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {formatMenuOpen && (
+                <View style={styles.formatMenu}>
+                  {[
+                    { kind: 'zip' as const, icon: 'folder-zip' as const, label: 'JSON + images' },
+                    { kind: 'csv' as const, icon: 'table-chart' as const, label: 'CSV for Excel' },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.kind}
+                      style={[
+                        styles.formatOption,
+                        exportKind === option.kind && styles.formatOptionActive,
+                      ]}
+                      onPress={() => {
+                        setExportKind(option.kind);
+                        setFormatMenuOpen(false);
+                      }}
+                    >
+                      <MaterialIcons name={option.icon} size={18} color="#2589C8" />
+                      <Text style={styles.formatOptionText}>{option.label}</Text>
+                      {exportKind === option.kind && (
+                        <MaterialIcons name="check" size={18} color="#2589C8" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
 
             <View style={styles.infoBox}>
               <MaterialIcons name="info" size={20} color="#3f4946" />
               <Text style={styles.infoText}>
-                Output file:{' '}
-                <Text style={styles.infoMono}>{filename}</Text>
-                {'\n'}The Android share sheet opens when the archive is built.
+                ZIP file:{' '}
+                <Text style={styles.infoMono}>{zipFilename}</Text>
+                {'\n'}CSV file:{' '}
+                <Text style={styles.infoMono}>{csvFilename}</Text>
+                {'\n'}The Android share sheet opens when the file is built.
               </Text>
             </View>
           </>
         )}
 
-        {/* ── Building phase ── */}
+        {/* Building phase */}
         {phase === 'building' && (
           <View style={styles.buildingCenter}>
             <View style={styles.spinnerWrap}>
@@ -164,14 +233,14 @@ export default function ExportScreen() {
                 style={[styles.spinnerRing, { transform: [{ rotate: spin }] }]}
               />
               <MaterialIcons
-                name="folder-zip"
+                name={exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
                 size={34}
                 color="#2589C8"
                 style={styles.spinnerIcon}
               />
             </View>
-            <Text style={styles.buildingTitle}>Building archive…</Text>
-            <Text style={styles.buildingFilename}>{filename}</Text>
+            <Text style={styles.buildingTitle}>{exportKind === 'csv' ? 'Building CSV...' : 'Building ZIP...'}</Text>
+            <Text style={styles.buildingFilename}>{activeFilename}</Text>
             <View style={styles.progressTrack}>
               <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
             </View>
@@ -180,7 +249,7 @@ export default function ExportScreen() {
         )}
       </View>
 
-      {/* ── Build & export button ── */}
+      {/* Build & export button */}
       {phase === 'summary' && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
           <TouchableOpacity
@@ -189,9 +258,17 @@ export default function ExportScreen() {
             activeOpacity={0.85}
             disabled={entries.length === 0}
           >
-            <MaterialIcons name="bolt" size={22} color="#fff" />
+            <MaterialIcons
+              name={exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
+              size={22}
+              color="#fff"
+            />
             <Text style={styles.buildBtnText}>
-              {entries.length === 0 ? 'No entries to export' : 'Build & export'}
+              {entries.length === 0
+                ? 'No entries to export'
+                : exportKind === 'csv'
+                  ? 'Export CSV'
+                  : 'Export ZIP'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -280,6 +357,52 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     maxWidth: '62%',
   },
+  formatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  formatSelect: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#F1F8FD',
+    borderWidth: 1,
+    borderColor: '#D2E4EF',
+  },
+  formatSelectText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#171d1b',
+  },
+  formatMenu: {
+    borderTopWidth: 1,
+    borderTopColor: '#E1EEF7',
+    padding: 8,
+    gap: 6,
+  },
+  formatOption: {
+    minHeight: 42,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 10,
+  },
+  formatOptionActive: {
+    backgroundColor: '#F1F8FD',
+  },
+  formatOptionText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#171d1b',
+  },
 
   // Info box
   infoBox: {
@@ -354,6 +477,7 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: 16,
     paddingTop: 14,
+    gap: 10,
   },
   buildBtn: {
     flexDirection: 'row',
