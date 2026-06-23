@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  Pressable,
   View,
   Text,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEntriesStore } from '../store/entriesStore';
 import { useFormStore } from '../store/formStore';
+import { colors } from '../theme/colors';
 import {
   buildAndExport,
   buildCsvExport,
@@ -125,7 +125,7 @@ export default function ExportScreen() {
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
+          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.screenTitle}>Export data</Text>
       </View>
@@ -143,7 +143,7 @@ export default function ExportScreen() {
 
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <MaterialIcons name="folder-zip" size={26} color="#2589C8" />
+                <MaterialIcons name="folder-zip" size={26} color={colors.brand.primary} />
                 <View>
                   <Text style={styles.cardHeaderTitle}>Ready to export</Text>
                   <Text style={styles.cardHeaderSub}>Choose ZIP with photos or CSV for Excel</Text>
@@ -171,7 +171,7 @@ export default function ExportScreen() {
                   <MaterialIcons
                     name={exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
                     size={18}
-                    color="#2589C8"
+                    color={colors.brand.primary}
                   />
                   <Text style={styles.formatSelectText}>
                     {exportKind === 'csv' ? 'CSV for Excel' : 'JSON + images'}
@@ -179,7 +179,7 @@ export default function ExportScreen() {
                   <MaterialIcons
                     name={formatMenuOpen ? 'expand-less' : 'expand-more'}
                     size={20}
-                    color="#3f4946"
+                    color={colors.text.secondary}
                   />
                 </TouchableOpacity>
               </View>
@@ -187,7 +187,7 @@ export default function ExportScreen() {
               {formatMenuOpen && (
                 <View style={styles.formatMenu}>
                   {[
-                    { kind: 'zip' as const, icon: 'folder-zip' as const, label: 'JSON + images' },
+                    { kind: 'zip' as const, icon: 'folder-zip' as const, label: 'ZIP + images' },
                     { kind: 'csv' as const, icon: 'table-chart' as const, label: 'CSV for Excel' },
                   ].map((option) => (
                     <TouchableOpacity
@@ -201,19 +201,23 @@ export default function ExportScreen() {
                         setFormatMenuOpen(false);
                       }}
                     >
-                      <MaterialIcons name={option.icon} size={18} color="#2589C8" />
+                      <MaterialIcons name={option.icon} size={18} color={colors.brand.primary} />
                       <Text style={styles.formatOptionText}>{option.label}</Text>
                       {exportKind === option.kind && (
-                        <MaterialIcons name="check" size={18} color="#2589C8" />
+                        <MaterialIcons name="check" size={18} color={colors.brand.primary} />
                       )}
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
+
+              <Text style={styles.formatHint}>
+                CSV opens in Excel but does not include photo files. Use ZIP if you need images.
+              </Text>
             </View>
 
             <View style={styles.infoBox}>
-              <MaterialIcons name="info" size={20} color="#3f4946" />
+              <MaterialIcons name="info" size={20} color={colors.text.secondary} />
               <Text style={styles.infoText}>
                 ZIP file:{' '}
                 <Text style={styles.infoMono}>{zipFilename}</Text>
@@ -235,7 +239,7 @@ export default function ExportScreen() {
               <MaterialIcons
                 name={exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
                 size={34}
-                color="#2589C8"
+                color={colors.brand.primary}
                 style={styles.spinnerIcon}
               />
             </View>
@@ -253,7 +257,7 @@ export default function ExportScreen() {
       {phase === 'summary' && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
           <TouchableOpacity
-            style={styles.buildBtn}
+            style={[styles.buildBtn, entries.length === 0 && styles.buildBtnDisabled]}
             onPress={handleBuild}
             activeOpacity={0.85}
             disabled={entries.length === 0}
@@ -261,7 +265,7 @@ export default function ExportScreen() {
             <MaterialIcons
               name={exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
               size={22}
-              color="#fff"
+              color={colors.text.inverse}
             />
             <Text style={styles.buildBtnText}>
               {entries.length === 0
@@ -278,7 +282,7 @@ export default function ExportScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F7FBFE' },
+  root: { flex: 1, backgroundColor: colors.background.app },
 
   topBar: {
     flexDirection: 'row',
@@ -298,7 +302,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: '500',
-    color: '#171d1b',
+    color: colors.text.primary,
     paddingLeft: 4,
   },
 
@@ -313,17 +317,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#ffdad6',
+    backgroundColor: colors.background.warningSoft,
     borderRadius: 12,
     padding: 12,
   },
-  errorText: { fontSize: 13, color: '#ba1a1a', flex: 1 },
+  errorText: { fontSize: 13, color: colors.text.danger, flex: 1 },
 
   // Stats card
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.white,
     borderWidth: 1,
-    borderColor: '#E1EEF7',
+    borderColor: colors.border.section,
     borderRadius: 20,
     overflow: 'hidden',
   },
@@ -332,12 +336,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 18,
-    backgroundColor: '#F1F8FD',
+    backgroundColor: colors.background.soft,
     borderBottomWidth: 1,
-    borderBottomColor: '#E1EEF7',
+    borderBottomColor: colors.border.section,
   },
-  cardHeaderTitle: { fontSize: 15, fontWeight: '600', color: '#171d1b' },
-  cardHeaderSub: { fontSize: 12, color: '#3f4946', marginTop: 1 },
+  cardHeaderTitle: { fontSize: 15, fontWeight: '600', color: colors.text.primary },
+  cardHeaderSub: { fontSize: 12, color: colors.text.secondary, marginTop: 1 },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -347,13 +351,13 @@ const styles = StyleSheet.create({
   },
   cardRowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#eef2f0',
+    borderBottomColor: colors.border.divider,
   },
-  cardRowLabel: { fontSize: 13, color: '#3f4946' },
+  cardRowLabel: { fontSize: 13, color: colors.text.secondary },
   cardRowValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#171d1b',
+    color: colors.text.primary,
     textAlign: 'right',
     maxWidth: '62%',
   },
@@ -371,18 +375,18 @@ const styles = StyleSheet.create({
     minHeight: 38,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: '#F1F8FD',
+    backgroundColor: colors.background.white,
     borderWidth: 1,
-    borderColor: '#D2E4EF',
+    borderColor: colors.brand.primary,
   },
   formatSelectText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   formatMenu: {
     borderTopWidth: 1,
-    borderTopColor: '#E1EEF7',
+    borderTopColor: colors.border.section,
     padding: 8,
     gap: 6,
   },
@@ -395,13 +399,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   formatOptionActive: {
-    backgroundColor: '#F1F8FD',
+    backgroundColor: colors.background.soft,
   },
   formatOptionText: {
     flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    color: '#171d1b',
+    color: colors.text.primary,
+  },
+  formatHint: {
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+    marginTop: -2,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.text.secondary,
   },
 
   // Info box
@@ -409,12 +421,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: '#F1F8FD',
+    backgroundColor: colors.background.soft,
     borderRadius: 14,
     padding: 14,
   },
-  infoText: { fontSize: 12.5, lineHeight: 19, color: '#3f4946', flex: 1 },
-  infoMono: { fontFamily: 'monospace', color: '#171d1b' },
+  infoText: { fontSize: 12.5, lineHeight: 19, color: colors.text.secondary, flex: 1 },
+  infoMono: { fontFamily: 'monospace', color: colors.text.primary },
 
   // Building
   buildingCenter: {
@@ -436,8 +448,8 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 48,
     borderWidth: 6,
-    borderColor: '#D8ECFA',
-    borderTopColor: '#2589C8',
+    borderColor: colors.border.formSection,
+    borderTopColor: colors.brand.primary,
   },
   spinnerIcon: {
     position: 'absolute',
@@ -445,31 +457,31 @@ const styles = StyleSheet.create({
   buildingTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
     marginTop: 22,
   },
   buildingFilename: {
     fontSize: 13,
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginTop: 4,
   },
   progressTrack: {
     width: 300,
     height: 8,
-    backgroundColor: '#D8ECFA',
+    backgroundColor: colors.border.formSection,
     borderRadius: 100,
     marginTop: 22,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#2589C8',
+    backgroundColor: colors.brand.primary,
     borderRadius: 100,
   },
   progressLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2589C8',
+    color: colors.brand.primary,
     marginTop: 8,
   },
 
@@ -486,16 +498,21 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 16,
     borderRadius: 18,
-    backgroundColor: '#2589C8',
-    shadowColor: '#17689B',
+    backgroundColor: colors.brand.primary,
+    shadowColor: colors.brand.primary,
     shadowOpacity: 0.32,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
+  buildBtnDisabled: {
+    backgroundColor: colors.action.disabled,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   buildBtnText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text.inverse,
   },
 });
