@@ -279,6 +279,9 @@ function GpsSection({ location }: { location: GpsLocation | undefined }) {
       </View>
       {hasValidLocation ? (
         <>
+          {location?.address ? (
+            <Text style={styles.gpsAddress}>{location.address}</Text>
+          ) : null}
           {mapUrl && !mapFailed ? (
             <View style={styles.mapPreview}>
               <Image
@@ -465,6 +468,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text.secondary,
+  },
+  gpsAddress: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text.primary,
+    marginTop: 4,
   },
   gpsSub: {
     fontSize: 12,

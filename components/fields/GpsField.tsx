@@ -7,11 +7,12 @@ type Props = {
   status: GpsStatus;
   coords?: string;
   accuracy?: string;
+  address?: string | null;
   onCapture: () => void;
   error?: boolean;
 };
 
-function GpsField({ status, coords, accuracy, onCapture, error }: Props) {
+function GpsField({ status, coords, accuracy, address, onCapture, error }: Props) {
   const spinAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -50,6 +51,7 @@ function GpsField({ status, coords, accuracy, onCapture, error }: Props) {
           </View>
           <View style={styles.textBlock}>
             <Text style={[styles.title, { color: '#17689B' }]}>Location captured</Text>
+            {address ? <Text style={styles.address}>{address}</Text> : null}
             <Text style={styles.sub}>{coords} · {accuracy}</Text>
           </View>
           <TouchableOpacity onPress={onCapture} style={styles.redoBtn}>
@@ -124,6 +126,12 @@ const styles = StyleSheet.create({
   sub: {
     fontSize: 12,
     color: '#3f4946',
+    marginTop: 1,
+  },
+  address: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#171d1b',
     marginTop: 1,
   },
   required: {

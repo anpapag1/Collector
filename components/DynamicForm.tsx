@@ -201,6 +201,7 @@ function renderField(
           status={ctx.gpsStatus}
           coords={coords}
           accuracy={accuracy}
+          address={loc?.address}
           onCapture={ctx.onGpsCapture ?? (() => {})}
           error={error}
         />
