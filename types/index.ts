@@ -63,6 +63,8 @@ export type SelectValue = string | OtherValue;
 
 export type EntryData = Record<string, any>;
 
+export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'error';
+
 export type Entry = {
   id: string;
   seq: number;
@@ -70,4 +72,11 @@ export type Entry = {
   formTitle?: string;
   fields?: FieldDef[];
   data: EntryData;
+
+  userId?: string | null;
+  syncStatus: SyncStatus;
+  remoteId?: string | null;
+  updatedAt: number;
+  syncError?: string | null;
+  syncAttempts?: number;
 };

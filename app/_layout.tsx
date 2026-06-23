@@ -14,6 +14,7 @@ import { loadBundledConfig } from '../utils/schemaLoader';
 import { useFormStore } from '../store/formStore';
 import { usePickerStore } from '../store/pickerStore';
 import { useEntriesStore } from '../store/entriesStore';
+import { useAuthStore } from '../store/authStore';
 
 SplashScreen.preventAutoHideAsync().catch((e) => console.warn('preventAutoHideAsync failed', e));
 
@@ -21,6 +22,11 @@ export default function RootLayout() {
   const hasInitialized = useFormStore((s) => s.hasInitialized);
   const loadSchema = useFormStore((s) => s.loadSchema);
   const setActivePresetId = usePickerStore((s) => s.setActivePresetId);
+  const initAuth = useAuthStore((s) => s.init);
+
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
 
   const [fontsLoaded] = useFonts({
     Roboto_400Regular,

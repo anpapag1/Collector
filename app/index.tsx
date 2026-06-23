@@ -328,6 +328,9 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.appTitle}>Collector</Text>
         </View>
+        <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings')}>
+          <MaterialIcons name="settings" size={24} color="#3f4946" />
+        </TouchableOpacity>
       </View>
 
       {/* ── Body ── */}
@@ -555,6 +558,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  settingsBtn: {
+    padding: 8,
+    borderRadius: 12,
   },
   pill: {
     flexDirection: 'row',

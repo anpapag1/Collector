@@ -52,8 +52,11 @@ yarn-error.*
 # IDE
 .vscode/
 .idea/
+
+# Ai
 .claude/
 CODE_REVIEW.md
+CLAUDE.md
 
 # stray generated docs
 Collector_Presentation.html

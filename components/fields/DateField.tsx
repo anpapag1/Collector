@@ -59,21 +59,19 @@ function DateField({ field, value, onChange, error }: Props) {
             value={dateObj}
             mode="date"
             display={Platform.OS === 'ios' ? 'inline' : 'default'}
-            onChange={(event, selected) => {
+            onValueChange={(event, selected) => {
               if (Platform.OS === 'android') {
                 // Android's native dialog closes itself after a selection or dismissal.
                 setPickerOpen(false);
-                if (event.type === 'set' && selected) {
+                if (selected) {
                   onChange(selected.toISOString());
                 }
               } else {
                 // iOS inline/spinner pickers fire 'set' continuously while scrolling,
                 // so only update the value here — keep the picker open until the
                 // user explicitly taps Done.
-                if (event.type === 'set' && selected) {
+                if (selected) {
                   onChange(selected.toISOString());
-                } else if (event.type === 'dismissed') {
-                  setPickerOpen(false);
                 }
               }
             }}

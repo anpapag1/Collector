@@ -48,6 +48,9 @@ type EntriesState = {
   addEntry: (data: EntryData, fields: FieldDef[], formTitle: string) => void;
   deleteEntry: (id: string) => void;
   clearEntries: () => void;
+  markSyncing: (id: string) => void;
+  markSynced: (id: string, remoteId: string) => void;
+  markSyncError: (id: string, message: string) => void;
 };
 
 export const useEntriesStore = create<EntriesState>()(
@@ -58,13 +61,17 @@ export const useEntriesStore = create<EntriesState>()(
       addEntry: (data, fields, formTitle) => {
         set((s) => {
           const seq = s.seqCounter + 1;
+          const now = Date.now();
           const entry: Entry = {
-            id: `entry-${seq}-${Date.now()}`,
+            id: `entry-${seq}-${now}`,
             seq,
-            createdAt: Date.now(),
+            createdAt: now,
             formTitle,
             fields,
             data,
+            userId: null,
+            syncStatus: 'pending',
+            updatedAt: now,
           };
           return { entries: [...s.entries, entry], seqCounter: seq };
         });
@@ -73,10 +80,52 @@ export const useEntriesStore = create<EntriesState>()(
         set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
       },
       clearEntries: () => set({ entries: [], seqCounter: 0 }),
+      markSyncing: (id) => {
+        set((s) => ({
+          entries: s.entries.map((e) =>
+            e.id === id ? { ...e, syncStatus: 'syncing' } : e
+          ),
+        }));
+      },
+      markSynced: (id, remoteId) => {
+        set((s) => ({
+          entries: s.entries.map((e) =>
+            e.id === id
+              ? { ...e, syncStatus: 'synced', remoteId, syncError: null, updatedAt: Date.now() }
+              : e
+          ),
+        }));
+      },
+      markSyncError: (id, message) => {
+        set((s) => ({
+          entries: s.entries.map((e) =>
+            e.id === id
+              ? {
+                  ...e,
+                  syncStatus: 'error',
+                  syncError: message,
+                  syncAttempts: (e.syncAttempts ?? 0) + 1,
+                }
+              : e
+          ),
+        }));
+      },
     }),
     {
       name: 'entries-storage',
+      version: 1,
       storage: createJSONStorage(() => safeAsyncStorage),
+      migrate: (persisted: any, version) => {
+        if (version === 0 && persisted?.entries) {
+          persisted.entries = persisted.entries.map((e: any) => ({
+            ...e,
+            userId: e.userId ?? null,
+            syncStatus: e.syncStatus ?? 'pending',
+            updatedAt: e.updatedAt ?? e.createdAt,
+          }));
+        }
+        return persisted;
+      },
     }
   )
 );
