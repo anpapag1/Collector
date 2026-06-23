@@ -1,3 +1,4 @@
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   View,
@@ -15,7 +16,26 @@ import { formatDate, timeAgo } from '../../utils/timeUtils';
 import { FieldDef, PhotoItem, GpsLocation } from '../../types';
 import { selectValueLabel } from '../../utils/formLogic';
 import { getEntryDisplayNumbers } from '../../utils/entryNumbering';
-import { useMemo } from 'react';
+import { colors } from '../../theme/colors';
+
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+
+function staticMapUrl(lat: number, lng: number) {
+  if (GOOGLE_MAPS_API_KEY) {
+    const center = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+    const markerColor = colors.brand.primary.replace('#', '0x');
+    const marker = encodeURIComponent(`color:${markerColor}|${center}`);
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=15&size=640x260&scale=2&maptype=roadmap&markers=${marker}&key=${GOOGLE_MAPS_API_KEY}`;
+  }
+
+  if (!MAPBOX_TOKEN) return null;
+
+  const markerColor = colors.brand.primary.replace('#', '');
+  const marker = `pin-s+${markerColor}(${lng.toFixed(6)},${lat.toFixed(6)})`;
+  const center = `${lng.toFixed(6)},${lat.toFixed(6)},15,0`;
+  return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${marker}/${center}/640x260@2x?access_token=${MAPBOX_TOKEN}`;
+}
 
 export default function EntryDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -236,39 +256,51 @@ function RatingSection({ label, rating, max }: { label: string; rating: number; 
 }
 
 function GpsSection({ location }: { location: GpsLocation | undefined }) {
+  const lat = location ? Number(location.lat) : NaN;
+  const lng = location ? Number(location.lng) : NaN;
+  const hasValidLocation = Number.isFinite(lat) && Number.isFinite(lng);
+  const mapUrl = hasValidLocation ? staticMapUrl(lat, lng) : null;
+  const [mapFailed, setMapFailed] = useState(false);
+
   return (
     <View style={styles.gpsCard}>
-      <View style={styles.gpsRow}>
-        <View style={styles.gpsIconCircle}>
-          <MaterialIcons name="location-on" size={20} color="#2589C8" />
-        </View>
-        <View style={styles.gpsText}>
-          {location ? (
-            <>
-              <Text style={styles.gpsCoords}>
-                {(() => {
-                  const lat = Number(location.lat);
-                  const lng = Number(location.lng);
-                  return Number.isFinite(lat) && Number.isFinite(lng)
-                    ? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-                    : 'unknown';
-                })()}
-              </Text>
-              <Text style={styles.gpsSub}>
-                Accuracy{' '}
-                {(() => {
-                  const acc = Number(location.accuracy);
-                  return typeof location.accuracy === 'number' && Number.isFinite(acc)
-                    ? `±${acc.toFixed(1)} m`
-                    : 'unknown';
-                })()}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.gpsSub}>No location captured</Text>
-          )}
-        </View>
+      <Text style={styles.fieldLabel}>Location</Text>
+      <View style={styles.gpsMetaRow}>
+        <MaterialIcons name="location-on" size={17} color={colors.brand.primary} />
+        <Text style={styles.gpsCoords}>
+          {hasValidLocation ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'No location captured'}
+        </Text>
       </View>
+      {hasValidLocation ? (
+        <>
+          {mapUrl && !mapFailed ? (
+            <View style={styles.mapPreview}>
+              <Image
+                source={{ uri: mapUrl }}
+                style={styles.mapImage}
+                resizeMode="cover"
+                onError={() => setMapFailed(true)}
+              />
+            </View>
+          ) : (
+            <View style={[styles.mapPreview, styles.mapPreviewEmpty]}>
+              <MaterialIcons name="map" size={30} color={colors.text.muted} />
+              <Text style={styles.mapPreviewEmptyText}>
+                {mapFailed ? 'Map preview could not load' : 'Map preview needs a Mapbox token'}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.gpsSub}>
+            Accuracy{' '}
+            {(() => {
+              const acc = Number(location?.accuracy);
+              return typeof location?.accuracy === 'number' && Number.isFinite(acc)
+                ? `+/-${acc.toFixed(1)} m`
+                : 'unknown';
+            })()}
+          </Text>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -411,29 +443,54 @@ const styles = StyleSheet.create({
 
   // GPS
   gpsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.white,
     borderRadius: 16,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#E3F0F8',
+    borderColor: colors.border.soft,
+    gap: 10,
   },
-  gpsRow: {
+  gpsMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 7,
   },
-  gpsIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#EAF6FD',
+  gpsCoords: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.secondary,
+  },
+  gpsSub: {
+    fontSize: 12,
+    color: colors.text.secondary,
+  },
+  mapPreview: {
+    height: 154,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: colors.background.muted,
+    borderWidth: 1,
+    borderColor: colors.border.section,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
-  gpsText: { flex: 1 },
-  gpsCoords: { fontSize: 14, fontWeight: '600', color: '#171d1b' },
-  gpsSub: { fontSize: 12, color: '#3f4946', marginTop: 2 },
+  mapImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mapPreviewEmpty: {
+    backgroundColor: colors.background.fieldSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+  },
+  mapPreviewEmptyText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.muted,
+    textAlign: 'center',
+  },
 
   // Photos
   photoGrid: {
