@@ -1,8 +1,11 @@
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
+import { colors } from '../theme/colors';
+import ScreenBubbles from '../components/ScreenBubbles';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -15,9 +18,10 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
+      <ScreenBubbles />
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
+          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>Settings</Text>
       </View>
@@ -27,7 +31,7 @@ export default function SettingsScreen() {
 
         {authUser ? (
           <TouchableOpacity style={styles.row} onPress={handleSignOut}>
-            <MaterialIcons name="logout" size={22} color="#3f4946" />
+            <MaterialIcons name="logout" size={22} color={colors.text.secondary} />
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Sign out</Text>
               <Text style={styles.rowSub} numberOfLines={1}>{authUser.email}</Text>
@@ -35,7 +39,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.row} onPress={() => router.push('/(auth)/login')}>
-            <MaterialIcons name="login" size={22} color="#3f4946" />
+            <MaterialIcons name="login" size={22} color={colors.text.secondary} />
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Sign in</Text>
               <Text style={styles.rowSub}>Sync your entries across devices</Text>
@@ -50,7 +54,8 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#f4fbf8',
+    backgroundColor: colors.background.app,
+    overflow: 'hidden',
   },
   topBar: {
     flexDirection: 'row',
@@ -65,7 +70,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   section: {
     marginTop: 12,
@@ -75,7 +80,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
-    color: '#3f4946',
+    color: colors.text.secondary,
     fontWeight: '600',
     marginBottom: 8,
     marginLeft: 6,
@@ -84,9 +89,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.white,
     borderWidth: 1,
-    borderColor: '#d3e0db',
+    borderColor: colors.border.default,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -98,11 +103,11 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   rowSub: {
     fontSize: 12,
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginTop: 1,
   },
 });

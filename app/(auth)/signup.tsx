@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
+import { colors } from '../../theme/colors';
+import ScreenBubbles from '../../components/ScreenBubbles';
 
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
@@ -23,6 +25,8 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
@@ -40,11 +44,13 @@ export default function SignupScreen() {
       setError('Passwords do not match');
       return;
     }
+
     const { error: signUpError } = await signUp(email.trim(), password);
     if (signUpError) {
       setError(signUpError);
       return;
     }
+
     setSubmittedEmail(email.trim());
   };
 
@@ -53,6 +59,7 @@ export default function SignupScreen() {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <ScreenBubbles />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -61,7 +68,7 @@ export default function SignupScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
-          <MaterialIcons name="close" size={24} color="#3f4946" />
+          <MaterialIcons name="close" size={24} color={colors.text.secondary} />
         </TouchableOpacity>
 
         <Text style={styles.title}>Create account</Text>
@@ -75,7 +82,7 @@ export default function SignupScreen() {
               value={email}
               onChangeText={setEmail}
               placeholder="you@example.com"
-              placeholderTextColor="#7a847f"
+              placeholderTextColor={colors.text.placeholder}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
@@ -85,28 +92,60 @@ export default function SignupScreen() {
 
           <View>
             <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              placeholderTextColor="#7a847f"
-              secureTextEntry
-              textContentType="newPassword"
-            />
+            <View style={styles.passwordField}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                placeholderTextColor={colors.text.placeholder}
+                secureTextEntry={!passwordVisible}
+                textContentType="newPassword"
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setPasswordVisible((visible) => !visible)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+              >
+                <MaterialIcons
+                  name={passwordVisible ? 'visibility-off' : 'visibility'}
+                  size={22}
+                  color={colors.text.secondary}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View>
             <Text style={styles.label}>Confirm password</Text>
-            <TextInput
-              style={styles.input}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="••••••••"
-              placeholderTextColor="#7a847f"
-              secureTextEntry
-              textContentType="newPassword"
-            />
+            <View style={styles.passwordField}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Confirm your password"
+                placeholderTextColor={colors.text.placeholder}
+                secureTextEntry={!confirmPasswordVisible}
+                textContentType="newPassword"
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setConfirmPasswordVisible((visible) => !visible)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  confirmPasswordVisible ? 'Hide confirm password' : 'Show confirm password'
+                }
+              >
+                <MaterialIcons
+                  name={confirmPasswordVisible ? 'visibility-off' : 'visibility'}
+                  size={22}
+                  color={colors.text.secondary}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
@@ -117,13 +156,12 @@ export default function SignupScreen() {
             disabled={loading}
             activeOpacity={0.85}
           >
-            <Text style={styles.submitText}>{loading ? 'Creating account…' : 'Sign up'}</Text>
+            <Text style={styles.submitText}>
+              {loading ? 'Creating account...' : 'Sign up'}
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.linkBtn}
-            onPress={() => router.push('/(auth)/login')}
-          >
+          <TouchableOpacity style={styles.linkBtn} onPress={() => router.push('/(auth)/login')}>
             <Text style={styles.linkText}>
               Already have an account? <Text style={styles.linkTextBold}>Sign in</Text>
             </Text>
@@ -139,7 +177,7 @@ export default function SignupScreen() {
       >
         <View style={styles.modalScrim}>
           <View style={styles.modalCard}>
-            <MaterialIcons name="mark-email-read" size={44} color="#006a60" />
+            <MaterialIcons name="mark-email-read" size={44} color={colors.brand.primary} />
             <Text style={styles.modalTitle}>Check your email</Text>
             <Text style={styles.modalSubtitle}>
               We sent a verification link to{'\n'}
@@ -163,7 +201,8 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#f4fbf8',
+    backgroundColor: colors.background.app,
+    overflow: 'hidden',
   },
   content: {
     paddingHorizontal: 24,
@@ -171,14 +210,14 @@ const styles = StyleSheet.create({
   },
   modalScrim: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: colors.overlay.scrim,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
   },
   modalCard: {
     width: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.white,
     borderRadius: 22,
     paddingHorizontal: 24,
     paddingVertical: 28,
@@ -188,17 +227,17 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 19,
     fontWeight: '700',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   modalSubtitle: {
     fontSize: 13.5,
-    color: '#3f4946',
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 19,
   },
   modalEmail: {
     fontWeight: '700',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   closeBtn: {
     alignSelf: 'flex-end',
@@ -208,11 +247,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   subtitle: {
     fontSize: 14,
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginTop: 6,
     marginBottom: 28,
   },
@@ -222,7 +261,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginBottom: 7,
   },
   input: {
@@ -230,17 +269,32 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#bec9c4',
-    backgroundColor: '#fff',
+    borderColor: colors.border.input,
+    backgroundColor: colors.background.white,
     fontSize: 15,
-    color: '#171d1b',
+    color: colors.text.primary,
+  },
+  passwordField: {
+    position: 'relative',
+  },
+  passwordInput: {
+    paddingRight: 50,
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 8,
+    top: 0,
+    bottom: 0,
+    width: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorText: {
     fontSize: 13,
-    color: '#ba1a1a',
+    color: colors.text.danger,
   },
   submitBtn: {
-    backgroundColor: '#006a60',
+    backgroundColor: colors.brand.primary,
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
@@ -252,7 +306,7 @@ const styles = StyleSheet.create({
   submitText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text.inverse,
   },
   linkBtn: {
     alignItems: 'center',
@@ -261,10 +315,10 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 13.5,
-    color: '#3f4946',
+    color: colors.text.secondary,
   },
   linkTextBold: {
-    color: '#006a60',
+    color: colors.brand.primary,
     fontWeight: '700',
   },
 });

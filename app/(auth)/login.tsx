@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,34 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { useAuthStore } from '../../store/authStore';
+import { colors } from '../../theme/colors';
+import ScreenBubbles from '../../components/ScreenBubbles';
+
+function GoogleLogo({ size = 34 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <Path
+        fill="#4285F4"
+        d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.4c-.5 2.7-2.1 5-4.5 6.5v5.4h7.3c4.3-3.9 6.9-9.8 6.9-15.9z"
+      />
+      <Path
+        fill="#34A853"
+        d="M24 47c6.1 0 11.2-2 15-5.5l-7.3-5.4c-2 1.3-4.5 2.1-7.7 2.1-5.9 0-10.9-3.9-12.7-9.2H3.8v5.6C7.5 42 15.2 47 24 47z"
+      />
+      <Path
+        fill="#FBBC05"
+        d="M11.3 28.9c-.5-1.3-.7-2.8-.7-4.3s.2-3 .7-4.3v-5.6H3.8C2.3 17.6 1.5 21 1.5 24.5s.8 6.9 2.3 9.8l7.5-5.4z"
+      />
+      <Path
+        fill="#EA4335"
+        d="M24 10.9c3.3 0 6.3 1.1 8.6 3.4l6.5-6.5C35.2 4.2 30.1 2 24 2 15.2 2 7.5 7 3.8 14.6l7.5 5.6c1.8-5.4 6.8-9.3 12.7-9.3z"
+      />
+    </Svg>
+  );
+}
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -22,6 +48,7 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const goBackHome = () => {
@@ -35,11 +62,13 @@ export default function LoginScreen() {
       setError('Enter your email and password');
       return;
     }
+
     const { error: signInError } = await signIn(email.trim(), password);
     if (signInError) {
       setError(signInError);
       return;
     }
+
     goBackHome();
   };
 
@@ -50,6 +79,7 @@ export default function LoginScreen() {
       setError(googleError);
       return;
     }
+
     goBackHome();
   };
 
@@ -58,6 +88,7 @@ export default function LoginScreen() {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <ScreenBubbles />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -66,7 +97,7 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
-          <MaterialIcons name="close" size={24} color="#3f4946" />
+          <MaterialIcons name="close" size={24} color={colors.text.secondary} />
         </TouchableOpacity>
 
         <Text style={styles.title}>Welcome back</Text>
@@ -80,7 +111,7 @@ export default function LoginScreen() {
               value={email}
               onChangeText={setEmail}
               placeholder="you@example.com"
-              placeholderTextColor="#7a847f"
+              placeholderTextColor={colors.text.placeholder}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
@@ -90,15 +121,30 @@ export default function LoginScreen() {
 
           <View>
             <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              placeholderTextColor="#7a847f"
-              secureTextEntry
-              textContentType="password"
-            />
+            <View style={styles.passwordField}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                placeholderTextColor={colors.text.placeholder}
+                secureTextEntry={!passwordVisible}
+                textContentType="password"
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setPasswordVisible((visible) => !visible)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+              >
+                <MaterialIcons
+                  name={passwordVisible ? 'visibility-off' : 'visibility'}
+                  size={22}
+                  color={colors.text.secondary}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
@@ -109,7 +155,7 @@ export default function LoginScreen() {
             disabled={loading}
             activeOpacity={0.85}
           >
-            <Text style={styles.submitText}>{loading ? 'Signing in…' : 'Sign in'}</Text>
+            <Text style={styles.submitText}>{loading ? 'Signing in...' : 'Sign in'}</Text>
           </TouchableOpacity>
 
           <View style={styles.dividerRow}>
@@ -123,15 +169,13 @@ export default function LoginScreen() {
             onPress={handleGoogleSignIn}
             disabled={loading}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
           >
-            <MaterialCommunityIcons name="google" size={18} color="#3f4946" />
-            <Text style={styles.googleText}>Continue with Google</Text>
+            <GoogleLogo />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.linkBtn}
-            onPress={() => router.push('/(auth)/signup')}
-          >
+          <TouchableOpacity style={styles.linkBtn} onPress={() => router.push('/(auth)/signup')}>
             <Text style={styles.linkText}>
               Don't have an account? <Text style={styles.linkTextBold}>Sign up</Text>
             </Text>
@@ -145,7 +189,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#f4fbf8',
+    backgroundColor: colors.background.app,
+    overflow: 'hidden',
   },
   content: {
     paddingHorizontal: 24,
@@ -159,11 +204,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   subtitle: {
     fontSize: 14,
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginTop: 6,
     marginBottom: 28,
   },
@@ -173,7 +218,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginBottom: 7,
   },
   input: {
@@ -181,17 +226,32 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#bec9c4',
-    backgroundColor: '#fff',
+    borderColor: colors.border.input,
+    backgroundColor: colors.background.white,
     fontSize: 15,
-    color: '#171d1b',
+    color: colors.text.primary,
+  },
+  passwordField: {
+    position: 'relative',
+  },
+  passwordInput: {
+    paddingRight: 50,
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 8,
+    top: 0,
+    bottom: 0,
+    width: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorText: {
     fontSize: 13,
-    color: '#ba1a1a',
+    color: colors.text.danger,
   },
   submitBtn: {
-    backgroundColor: '#006a60',
+    backgroundColor: colors.brand.primary,
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
@@ -203,7 +263,7 @@ const styles = StyleSheet.create({
   submitText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text.inverse,
   },
   dividerRow: {
     flexDirection: 'row',
@@ -214,27 +274,22 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#dde4e1',
+    backgroundColor: colors.border.divider,
   },
   dividerText: {
     fontSize: 12,
-    color: '#7a847f',
+    color: colors.text.placeholder,
   },
   googleBtn: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    alignSelf: 'center',
+    width: 62,
+    height: 62,
+    backgroundColor: colors.background.white,
+    borderRadius: 31,
     borderWidth: 1,
-    borderColor: '#bec9c4',
-    paddingVertical: 14,
-  },
-  googleText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#3f4946',
+    borderColor: colors.border.input,
   },
   linkBtn: {
     alignItems: 'center',
@@ -243,10 +298,10 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 13.5,
-    color: '#3f4946',
+    color: colors.text.secondary,
   },
   linkTextBold: {
-    color: '#006a60',
+    color: colors.brand.primary,
     fontWeight: '700',
   },
 });
