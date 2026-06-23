@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
+import { useEntriesStore } from '../store/entriesStore';
 import { colors } from '../theme/colors';
 import ScreenBubbles from '../components/ScreenBubbles';
 
@@ -11,9 +12,30 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const authUser = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
+  const entries = useEntriesStore((s) => s.entries);
+  const clearLocalOnly = useEntriesStore((s) => s.clearLocalOnly);
 
-  const handleSignOut = async () => {
-    await signOut();
+  const handleSignOut = () => {
+    if (entries.length === 0) {
+      signOut();
+      return;
+    }
+    Alert.alert(
+      'Entries on this device',
+      `You have ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} stored locally. Keep them on this device for offline use, or delete them now? (Anything already synced stays safe in your account either way.)`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete from device',
+          style: 'destructive',
+          onPress: () => {
+            clearLocalOnly();
+            signOut();
+          },
+        },
+        { text: 'Keep offline', onPress: () => signOut() },
+      ]
+    );
   };
 
   return (

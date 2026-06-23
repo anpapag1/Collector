@@ -1,9 +1,20 @@
 import { create } from 'zustand';
+import { Alert } from 'react-native';
 import type { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
-import { claimLegacyEntriesForUser } from '../services/migrateLegacyEntries';
+
+// Deferred on purpose (see store/entriesStore.ts for the full explanation):
+// migrateLegacyEntries.ts and syncEngine.ts both import this module back, so
+// a static import here would re-enter this module mid-load. These are only
+// needed once an actual auth-state change fires, well after boot.
+function getMigrateLegacyEntries() {
+  return require('../services/migrateLegacyEntries') as typeof import('../services/migrateLegacyEntries');
+}
+function requestSync() {
+  require('../services/syncEngine').requestSync();
+}
 
 type AuthState = {
   session: Session | null;
@@ -49,7 +60,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     supabase.auth.onAuthStateChange((event, session) => {
       set({ session, user: session?.user ?? null });
       if (event === 'SIGNED_IN' && session) {
-        claimLegacyEntriesForUser(session.user.id);
+        const migrate = getMigrateLegacyEntries();
+        const unclaimed = migrate.getUnclaimedEntries();
+        if (unclaimed.length === 0) {
+          requestSync();
+          return;
+        }
+        const userId = session.user.id;
+        Alert.alert(
+          'Entries on this device',
+          `You have ${unclaimed.length} ${unclaimed.length === 1 ? 'entry' : 'entries'} collected before signing in. Upload them to your account, or discard them and just use what's already in your account?`,
+          [
+            { text: 'Discard local', style: 'destructive', onPress: () => migrate.discardUnclaimedEntries() },
+            { text: 'Upload & sync', onPress: () => migrate.claimLegacyEntriesForUser(userId) },
+          ]
+        );
       }
     });
 

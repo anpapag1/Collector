@@ -85,6 +85,12 @@ export default function EntryDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.topLabel}>Entry #{String(displayNumber).padStart(2, '0')}</Text>
         <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={() => router.push(`/edit-entry/${entry.id}`)}
+        >
+          <MaterialIcons name="edit" size={22} color="#3f4946" />
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.iconBtn, styles.deleteBtn]}
           onPress={handleDelete}
         >

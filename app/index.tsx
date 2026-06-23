@@ -368,7 +368,7 @@ export default function HomeScreen() {
       if (result.canceled) return;
       const config = await loadFromPath(result.assets[0].uri);
       const importId = `custom-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      addCustomForm(config, importId);
+      addCustomForm(config, importId, session?.user.id ?? null);
       loadSchema(config);
       setActivePresetId(importId);
     } catch (e) {

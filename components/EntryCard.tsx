@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Entry, PhotoItem } from '../types';
 import { timeAgo } from '../utils/timeUtils';
 import { colors } from '../theme/colors';
+import { useAuthStore } from '../store/authStore';
 
 const SYNC_STATUS_META: Record<
   string,
@@ -86,7 +87,8 @@ function EntryCard({ entry, displayNumber, onOpen }: Props) {
 
   const totalFields = fields ? fields.length : Object.keys(data).length;
 
-  const syncMeta = entry.syncStatus ? SYNC_STATUS_META[entry.syncStatus] : null;
+  const signedIn = useAuthStore((s) => !!s.session);
+  const syncMeta = signedIn && entry.syncStatus ? SYNC_STATUS_META[entry.syncStatus] : null;
 
   const handleSyncBadgePress = () => {
     if (entry.syncStatus === 'error' && entry.syncError) {

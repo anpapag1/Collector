@@ -3,7 +3,17 @@ import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Entry, EntryData, FieldDef, PhotoItem } from '../types';
 import { supabase } from '../lib/supabase';
-import { requestSync } from '../services/syncEngine';
+
+// Deferred (not a top-level `import`) on purpose: entriesStore.ts loads very
+// early (via formStore.ts, before any user interaction), and syncEngine.ts
+// in turn imports entriesStore/authStore/pickerStore. A static import here
+// would make Metro re-enter this module mid-load, handing those other
+// modules a partially-initialized export. Resolving it lazily, the first
+// time requestSync() is actually called, means everything has already
+// finished loading by then.
+function requestSync() {
+  require('../services/syncEngine').requestSync();
+}
 
 // Mirrors the upload path's path convention (services/syncEngine.ts) so a
 // deleted entry's photos can be found and removed from Storage too. Only
@@ -63,8 +73,10 @@ export const safeAsyncStorage: StateStorage = {
 type EntriesState = {
   entries: Entry[];
   addEntry: (data: EntryData, fields: FieldDef[], formTitle: string) => void;
+  updateEntry: (id: string, data: EntryData) => void;
   deleteEntry: (id: string) => void;
-  clearEntries: () => void;
+  clearEntries: (options?: { deleteRemote?: boolean }) => void;
+  clearLocalOnly: () => void;
   markSyncing: (id: string) => void;
   markSynced: (id: string, remoteId: string) => void;
   markSyncError: (id: string, message: string) => void;
@@ -93,6 +105,17 @@ export const useEntriesStore = create<EntriesState>()(
         // Fire-and-forget: never block the save-and-navigate flow on network activity.
         requestSync();
       },
+      updateEntry: (id, data) => {
+        set((s) => ({
+          entries: s.entries.map((e) =>
+            e.id === id ? { ...e, data, syncStatus: 'pending', updatedAt: Date.now() } : e
+          ),
+        }));
+        // Re-syncing an edited entry is just another upsert keyed on
+        // (user_id, local_id) — it updates the existing remote row rather
+        // than creating a new one, so no special "edit" path is needed there.
+        requestSync();
+      },
       deleteEntry: (id) => {
         let removed: Entry | undefined;
         set((s) => {
@@ -111,11 +134,13 @@ export const useEntriesStore = create<EntriesState>()(
           }
         }
       },
-      clearEntries: () => {
+      clearEntries: ({ deleteRemote = true }: { deleteRemote?: boolean } = {}) => {
         const entries = useEntriesStore.getState().entries;
+        set({ entries: [] });
+        if (!deleteRemote) return;
+
         const remoteIds = entries.map((e) => e.remoteId).filter((id): id is string => !!id);
         const photoPaths = entries.flatMap((e) => (e.remoteId ? photoStoragePaths(e) : []));
-        set({ entries: [] });
         if (remoteIds.length > 0) {
           supabase.from('entries').delete().in('id', remoteIds).then(({ error }) => {
             if (error) console.warn('[sync] best-effort bulk remote delete failed', error);
@@ -127,6 +152,9 @@ export const useEntriesStore = create<EntriesState>()(
           });
         }
       },
+      // Used when signing out and choosing to keep the cloud copy but wipe
+      // this device — never touches Supabase, just clears the local cache.
+      clearLocalOnly: () => set({ entries: [] }),
       markSyncing: (id) => {
         set((s) => ({
           entries: s.entries.map((e) =>

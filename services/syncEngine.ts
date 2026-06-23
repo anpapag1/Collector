@@ -3,7 +3,8 @@ import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useEntriesStore } from '../store/entriesStore';
-import { Entry, EntryData, PhotoItem } from '../types';
+import { usePickerStore } from '../store/pickerStore';
+import { Entry, EntryData, FormConfig, PhotoItem } from '../types';
 
 const PHOTO_UPLOAD_TIMEOUT_MS = 30_000;
 const STALE_SYNCING_MS = 2 * 60_000;
@@ -52,6 +53,7 @@ async function runSync(): Promise<void> {
     }
 
     await pullRemoteEntries(userId);
+    await pullRemoteForms(userId);
   } finally {
     isRunning = false;
     if (queuedRerun) {
@@ -210,6 +212,28 @@ async function downloadOnePhoto(photo: { id: string; path: string }): Promise<Ph
   );
 
   return { id: photo.id, uri: dest };
+}
+
+// Symmetric to pickerStore.addCustomForm's push: brings down any forms
+// already in the account that this device hasn't imported yet.
+async function pullRemoteForms(userId: string): Promise<void> {
+  const { data: rows, error } = await supabase
+    .from('forms')
+    .select('id, form_id, version, schema')
+    .eq('user_id', userId);
+  if (error) {
+    console.warn('[sync] forms pull failed', error);
+    return;
+  }
+
+  const local = usePickerStore.getState().customForms;
+  const existingKeys = new Set(local.map((c) => `${c.config.formId}@${c.config.version}`));
+  const missing = (rows ?? []).filter((row) => !existingKeys.has(`${row.form_id}@${row.version}`));
+  if (missing.length === 0) return;
+
+  usePickerStore.getState().mergeRemoteForms(
+    missing.map((row) => ({ importId: row.id, config: row.schema as FormConfig }))
+  );
 }
 
 // Supabase errors come back as plain objects (PostgrestError/StorageError),
