@@ -26,7 +26,7 @@ function ImageField({ field, value, onChange, onAddPress }: Props) {
           </View>
         ))}
         <TouchableOpacity style={styles.addTile} onPress={onAddPress}>
-          <MaterialIcons name="add-a-photo" size={24} color="#006a60" />
+          <MaterialIcons name="add-a-photo" size={24} color="#2589C8" />
           <Text style={styles.addText}>Add</Text>
         </TouchableOpacity>
       </View>
@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     borderWidth: 1,
-    borderColor: '#c2d2cc',
+    borderColor: '#B8C9D4',
   },
   image: {
     width: '100%',
@@ -76,8 +76,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: '#9fb3ad',
-    backgroundColor: '#eef5f1',
+    borderColor: '#8EA8B8',
+    backgroundColor: '#F1F8FD',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   addText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#006a60',
+    color: '#2589C8',
   },
 });
 

@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#006A60",
+        "backgroundColor": "#2589C8",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
@@ -29,7 +29,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "backgroundColor": "#006A60"
+          "backgroundColor": "#2589C8"
         }
       ],
       "@react-native-community/datetimepicker",

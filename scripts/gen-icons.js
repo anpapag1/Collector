@@ -4,7 +4,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const SVG = path.join(ROOT, 'assets', 'Collector_Logo.svg');
-const BG = '#006A60';
+const BG = '#2589C8';
 
 async function logoOnBg({ size, padRatio = 0, bg = null }) {
   const inner = Math.round(size * (1 - padRatio * 2));
@@ -93,14 +93,16 @@ async function writeWebp(buf, dest) {
 
   // --- actual compiled native android resources (android/app/src/main/res) ---
   const resRoot = path.join(ROOT, 'android/app/src/main/res');
-  for (const [density, size] of Object.entries(launcherSizes)) {
-    const bg = await solidBg(size);
-    const fg = await logoOnBg({ size, padRatio: 0.17 });
-    const composed = await sharp(bg).composite([{ input: fg, gravity: 'center' }]).png().toBuffer();
-    await writeWebp(composed, path.join(resRoot, `mipmap-${density}/ic_launcher.webp`));
-    await writeWebp(composed, path.join(resRoot, `mipmap-${density}/ic_launcher_round.webp`));
-    await writeWebp(await logoOnBg({ size, padRatio: 0.17 }), path.join(resRoot, `mipmap-${density}/ic_launcher_foreground.webp`));
-    await writeWebp(await monochrome({ size, padRatio: 0.2 }), path.join(resRoot, `mipmap-${density}/ic_launcher_monochrome.webp`));
+  if (fs.existsSync(resRoot)) {
+    for (const [density, size] of Object.entries(launcherSizes)) {
+      const bg = await solidBg(size);
+      const fg = await logoOnBg({ size, padRatio: 0.17 });
+      const composed = await sharp(bg).composite([{ input: fg, gravity: 'center' }]).png().toBuffer();
+      await writeWebp(composed, path.join(resRoot, `mipmap-${density}/ic_launcher.webp`));
+      await writeWebp(composed, path.join(resRoot, `mipmap-${density}/ic_launcher_round.webp`));
+      await writeWebp(await logoOnBg({ size, padRatio: 0.17 }), path.join(resRoot, `mipmap-${density}/ic_launcher_foreground.webp`));
+      await writeWebp(await monochrome({ size, padRatio: 0.2 }), path.join(resRoot, `mipmap-${density}/ic_launcher_monochrome.webp`));
+    }
   }
 
   console.log('done');

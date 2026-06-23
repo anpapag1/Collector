@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
   Roboto_400Regular,
@@ -81,8 +82,10 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <SafeAreaProvider initialMetrics={initialWindowMetrics} style={styles.root}>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false }} />
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

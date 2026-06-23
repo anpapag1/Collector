@@ -25,7 +25,7 @@ function RatingField({ field, value, onChange, error }: Props) {
             <MaterialIcons
               name={n <= value ? 'star' : 'star-border'}
               size={34}
-              color={n <= value ? '#006a60' : '#c6d0cc'}
+              color={n <= value ? '#2589C8' : '#C4D1D8'}
             />
           </TouchableOpacity>
         ))}
