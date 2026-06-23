@@ -75,6 +75,7 @@ export type Entry = {
 
   userId?: string | null;
   syncStatus: SyncStatus;
+  syncingSince?: number | null;
   remoteId?: string | null;
   updatedAt: number;
   syncError?: string | null;

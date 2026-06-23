@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
+import { claimLegacyEntriesForUser } from '../services/migrateLegacyEntries';
 
 type AuthState = {
   session: Session | null;
@@ -45,8 +46,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         set({ initialized: true });
       });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
       set({ session, user: session?.user ?? null });
+      if (event === 'SIGNED_IN' && session) {
+        claimLegacyEntriesForUser(session.user.id);
+      }
     });
 
     const applyUrl = (url: string | null) => {

@@ -1,8 +1,18 @@
 import { memo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Entry } from '../types';
 import { timeAgo } from '../utils/timeUtils';
+
+const SYNC_STATUS_META: Record<
+  string,
+  { icon: keyof typeof MaterialIcons.glyphMap; color: string }
+> = {
+  pending: { icon: 'cloud-queue', color: '#8EA8B8' },
+  syncing: { icon: 'cloud-upload', color: '#006a60' },
+  synced: { icon: 'cloud-done', color: '#006a60' },
+  error: { icon: 'cloud-off', color: '#a1161f' },
+};
 
 type Props = {
   entry: Entry;
@@ -51,6 +61,14 @@ function EntryCard({ entry, onOpen }: Props) {
 
   const totalFields = fields ? fields.length : Object.keys(data).length;
 
+  const syncMeta = entry.syncStatus ? SYNC_STATUS_META[entry.syncStatus] : null;
+
+  const handleSyncBadgePress = () => {
+    if (entry.syncStatus === 'error' && entry.syncError) {
+      Alert.alert('Sync error', entry.syncError);
+    }
+  };
+
   return (
     <TouchableOpacity style={styles.card} onPress={onOpen} activeOpacity={0.72}>
       {/* Left: entry number */}
@@ -64,7 +82,17 @@ function EntryCard({ entry, onOpen }: Props) {
           {formTitle ? (
             <Text style={styles.formName} numberOfLines={1}>{formTitle}</Text>
           ) : null}
-          <Text style={styles.ago}>{timeAgo(createdAt)}</Text>
+          <View style={styles.topRowRight}>
+            {syncMeta &&
+              (entry.syncStatus === 'error' ? (
+                <TouchableOpacity onPress={handleSyncBadgePress} hitSlop={8}>
+                  <MaterialIcons name={syncMeta.icon} size={14} color={syncMeta.color} />
+                </TouchableOpacity>
+              ) : (
+                <MaterialIcons name={syncMeta.icon} size={14} color={syncMeta.color} />
+              ))}
+            <Text style={styles.ago}>{timeAgo(createdAt)}</Text>
+          </View>
         </View>
 
         <Text style={styles.preview} numberOfLines={1}>
@@ -154,6 +182,12 @@ const styles = StyleSheet.create({
   ago: {
     fontSize: 11,
     color: '#8EA8B8',
+    flexShrink: 0,
+  },
+  topRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     flexShrink: 0,
   },
 
