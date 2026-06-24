@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
@@ -25,6 +25,7 @@
       "expo-router",
       "expo-sharing",
       "expo-font",
+      "expo-system-ui",
       [
         "expo-splash-screen",
         {

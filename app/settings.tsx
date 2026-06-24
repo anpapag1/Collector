@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,9 +7,15 @@ import { useAuthStore } from '../store/authStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { colors } from '../theme/colors';
 import ScreenBubbles from '../components/ScreenBubbles';
+import ThemeToggle from '../components/ThemeToggle';
+import { useThemeStore } from '../store/themeStore';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const themeMode = useThemeStore((s) => s.mode);
+  const setThemeMode = useThemeStore((s) => s.setMode);
+  const isDark = themeMode === 'dark';
+  const styles = useMemo(() => createStyles(isDark), [isDark]);
   const authUser = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
   const entries = useEntriesStore((s) => s.entries);
@@ -40,12 +46,23 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <ScreenBubbles />
+      {!isDark && <ScreenBubbles />}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
+          <MaterialIcons
+            name="arrow-back"
+            size={24}
+            color={isDark ? '#F7FBFE' : colors.text.primary}
+          />
         </TouchableOpacity>
         <Text style={styles.title}>Settings</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Appearance</Text>
+        <View style={styles.appearanceCard}>
+          <ThemeToggle mode={themeMode} onChange={setThemeMode} />
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -53,7 +70,11 @@ export default function SettingsScreen() {
 
         {authUser ? (
           <TouchableOpacity style={styles.row} onPress={handleSignOut}>
-            <MaterialIcons name="logout" size={22} color={colors.text.secondary} />
+            <MaterialIcons
+              name="logout"
+              size={22}
+              color={isDark ? '#A4B7C1' : colors.text.secondary}
+            />
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Sign out</Text>
               <Text style={styles.rowSub} numberOfLines={1}>{authUser.email}</Text>
@@ -61,7 +82,11 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.row} onPress={() => router.push('/(auth)/login')}>
-            <MaterialIcons name="login" size={22} color={colors.text.secondary} />
+            <MaterialIcons
+              name="login"
+              size={22}
+              color={isDark ? '#A4B7C1' : colors.text.secondary}
+            />
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Sign in</Text>
               <Text style={styles.rowSub}>Sync your entries across devices</Text>
@@ -73,10 +98,10 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (isDark: boolean) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background.app,
+    backgroundColor: isDark ? '#050708' : colors.background.app,
     overflow: 'hidden',
   },
   topBar: {
@@ -92,7 +117,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: isDark ? '#F7FBFE' : colors.text.primary,
   },
   section: {
     marginTop: 12,
@@ -102,7 +127,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
-    color: colors.text.secondary,
+    color: isDark ? '#91A9B7' : colors.text.secondary,
     fontWeight: '600',
     marginBottom: 8,
     marginLeft: 6,
@@ -111,9 +136,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: colors.background.white,
+    backgroundColor: isDark ? '#101B21' : colors.background.white,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: isDark ? '#203744' : colors.border.default,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -125,11 +150,19 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: colors.text.primary,
+    color: isDark ? '#F7FBFE' : colors.text.primary,
   },
   rowSub: {
     fontSize: 12,
-    color: colors.text.secondary,
+    color: isDark ? '#A4B7C1' : colors.text.secondary,
     marginTop: 1,
+  },
+  appearanceCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: isDark ? '#203744' : colors.border.default,
+    backgroundColor: isDark ? '#101B21' : colors.background.white,
+    paddingHorizontal: 10,
+    paddingVertical: 14,
   },
 });

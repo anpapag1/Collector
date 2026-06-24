@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,12 +11,14 @@ import {
   Roboto_700Bold,
 } from '@expo-google-fonts/roboto';
 import * as SplashScreen from 'expo-splash-screen';
+import * as SystemUI from 'expo-system-ui';
 import { loadBundledConfig } from '../utils/schemaLoader';
 import { useFormStore } from '../store/formStore';
 import { usePickerStore } from '../store/pickerStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { useAuthStore } from '../store/authStore';
 import { useSyncStore } from '../store/syncStore';
+import { useThemeStore } from '../store/themeStore';
 
 SplashScreen.preventAutoHideAsync().catch((e) => console.warn('preventAutoHideAsync failed', e));
 
@@ -26,6 +28,7 @@ export default function RootLayout() {
   const setActivePresetId = usePickerStore((s) => s.setActivePresetId);
   const initAuth = useAuthStore((s) => s.init);
   const initSync = useSyncStore((s) => s.init);
+  const themeMode = useThemeStore((s) => s.mode);
 
   useEffect(() => {
     initAuth();
@@ -41,7 +44,8 @@ export default function RootLayout() {
   const [hasHydrated, setHasHydrated] = useState(
     useFormStore.persist.hasHydrated() &&
       useEntriesStore.persist.hasHydrated() &&
-      usePickerStore.persist.hasHydrated()
+      usePickerStore.persist.hasHydrated() &&
+      useThemeStore.persist.hasHydrated()
   );
 
   useEffect(() => {
@@ -50,7 +54,8 @@ export default function RootLayout() {
       if (
         useFormStore.persist.hasHydrated() &&
         useEntriesStore.persist.hasHydrated() &&
-        usePickerStore.persist.hasHydrated()
+        usePickerStore.persist.hasHydrated() &&
+        useThemeStore.persist.hasHydrated()
       ) {
         setHasHydrated(true);
       }
@@ -58,11 +63,13 @@ export default function RootLayout() {
     const unsubForm = useFormStore.persist.onFinishHydration(checkAllHydrated);
     const unsubEntries = useEntriesStore.persist.onFinishHydration(checkAllHydrated);
     const unsubPicker = usePickerStore.persist.onFinishHydration(checkAllHydrated);
+    const unsubTheme = useThemeStore.persist.onFinishHydration(checkAllHydrated);
     checkAllHydrated();
     return () => {
       unsubForm();
       unsubEntries();
       unsubPicker();
+      unsubTheme();
     };
   }, [hasHydrated]);
 
@@ -81,13 +88,25 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, hasHydrated, hasInitialized, loadSchema, setActivePresetId]);
 
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(themeMode === 'dark' ? '#050708' : '#F7FBFE')
+      .catch((e) => console.warn('Failed to update system background', e));
+  }, [themeMode]);
+
   if (!fontsLoaded || !hasHydrated) return null;
 
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider initialMetrics={initialWindowMetrics} style={styles.root}>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }} />
+        <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} animated />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: themeMode === 'dark' ? '#050708' : '#F7FBFE',
+            },
+          }}
+        />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
