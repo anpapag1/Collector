@@ -72,7 +72,7 @@ export const safeAsyncStorage: StateStorage = {
 
 type EntriesState = {
   entries: Entry[];
-  addEntry: (data: EntryData, fields: FieldDef[], formTitle: string) => void;
+  addEntry: (data: EntryData, fields: FieldDef[], formTitle: string, createdAt?: number) => void;
   updateEntry: (id: string, data: EntryData) => void;
   deleteEntry: (id: string) => void;
   clearEntries: (options?: { deleteRemote?: boolean }) => void;
@@ -87,12 +87,12 @@ export const useEntriesStore = create<EntriesState>()(
   persist(
     (set) => ({
       entries: [],
-      addEntry: (data, fields, formTitle) => {
+      addEntry: (data, fields, formTitle, createdAt) => {
         set((s) => {
           const now = Date.now();
           const entry: Entry = {
             id: `entry-${s.entries.length + 1}-${now}`,
-            createdAt: now,
+            createdAt: createdAt ?? now,
             formTitle,
             fields,
             data,

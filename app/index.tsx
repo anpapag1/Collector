@@ -31,7 +31,7 @@ import { FormConfig } from '../types';
 import { loadBundledConfig, loadFromPath } from '../utils/schemaLoader';
 import { getEntryDisplayNumbers } from '../utils/entryNumbering';
 import { requestSync } from '../services/syncEngine';
-import { AppColors } from '../theme/colors';
+import { AppColors, darkColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import { useThemeStore } from '../store/themeStore';
 
@@ -392,7 +392,7 @@ export default function HomeScreen() {
         <LinearGradient
           colors={
             isDark
-              ? ['#050708', '#0B2633', '#124D68']
+              ? [darkColors.brand.primaryDark, darkColors.brand.primary, darkColors.brand.primaryLight]
               : [colors.brand.primaryDark, colors.brand.primary, colors.brand.primaryLight]
           }
           start={{ x: 0, y: 0 }}
@@ -475,9 +475,14 @@ export default function HomeScreen() {
         {/* Latest entries header */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Latest entries</Text>
-          <TouchableOpacity onPress={() => router.push('/entries')}>
-            <Text style={styles.viewAll}>View all</Text>
-          </TouchableOpacity>
+          <View style={styles.sectionHeaderActions}>
+            <TouchableOpacity onPress={() => router.push('/map/all')}>
+              <Text style={styles.viewAll}>Open map</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/entries')}>
+              <Text style={styles.viewAll}>View all</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Empty state */}
@@ -771,6 +776,11 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.text.primary,
+  },
+  sectionHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   viewAll: {
     fontSize: 13,

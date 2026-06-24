@@ -13,7 +13,7 @@ const VALID_FIELD_TYPES: FieldType[] = [
   'date',
 ];
 
-function validateFormConfig(parsed: any): FormConfig {
+export function validateFormConfig(parsed: any): FormConfig {
   if (!parsed.formId || !parsed.formTitle || !parsed.fields) {
     throw new Error('Invalid form-config: missing formId, formTitle, or fields');
   }

@@ -10,6 +10,7 @@ import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import ScreenBubbles from '../components/ScreenBubbles';
 import ThemeToggle from '../components/ThemeToggle';
 import { useThemeStore } from '../store/themeStore';
+import { seedTestEntries } from '../utils/seedTestEntries';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -21,6 +22,23 @@ export default function SettingsScreen() {
   const signOut = useAuthStore((s) => s.signOut);
   const entries = useEntriesStore((s) => s.entries);
   const clearLocalOnly = useEntriesStore((s) => s.clearLocalOnly);
+
+  const handleSeedTestEntries = () => {
+    Alert.alert(
+      'Add 100 test entries?',
+      'This adds 100 sample entries (each with a placeholder photo) for the Erwtimatologio Simiou form, useful for stress-testing the list, sync, and export. They behave exactly like real entries.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add entries',
+          onPress: async () => {
+            const count = await seedTestEntries();
+            Alert.alert('Done', `${count} test entries added.`);
+          },
+        },
+      ]
+    );
+  };
 
   const handleSignOut = () => {
     if (entries.length === 0) {
@@ -94,6 +112,17 @@ export default function SettingsScreen() {
             </View>
           </TouchableOpacity>
         )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Developer</Text>
+        <TouchableOpacity style={styles.row} onPress={handleSeedTestEntries}>
+          <MaterialIcons name="science" size={22} color={colors.text.secondary} />
+          <View style={styles.rowBody}>
+            <Text style={styles.rowTitle}>Add 100 test entries</Text>
+            <Text style={styles.rowSub}>Stress-test data for Erwtimatologio Simiou</Text>
+          </View>
+        </TouchableOpacity>
       </View>
     </View>
   );

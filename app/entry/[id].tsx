@@ -7,10 +7,7 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  Modal,
-  Linking,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,15 +22,6 @@ import { colors } from '../../theme/colors';
 
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-
-type MapPoint = {
-  id: string;
-  title: string;
-  coordinate: {
-    latitude: number;
-    longitude: number;
-  };
-};
 
 function staticMapUrl(lat: number, lng: number) {
   if (GOOGLE_MAPS_API_KEY) {
@@ -61,25 +49,6 @@ export default function EntryDetailScreen() {
 
   const entry = entries.find((e) => e.id === id);
   const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
-  const mapPoints = useMemo(
-    () =>
-      entries
-        .map((item) => {
-          const location = entryLocation(item);
-          const number = displayNumbers.get(item.id) ?? 0;
-          if (!location) return null;
-          return {
-            id: item.id,
-            title: `Entry #${String(number).padStart(2, '0')}`,
-            coordinate: {
-              latitude: location.lat,
-              longitude: location.lng,
-            },
-          };
-        })
-        .filter((point): point is MapPoint => !!point),
-    [entries, displayNumbers]
-  );
 
   if (!entry) {
     return (
@@ -154,8 +123,8 @@ export default function EntryDetailScreen() {
 
         {/* Dynamic fields */}
         {fields
-          ? fields.map((field) => renderField(field, data[field.id], mapPoints, entry.id, colors, styles))
-          : renderLegacyData(data, mapPoints, entry.id, styles)
+          ? fields.map((field) => renderField(field, data[field.id], entry.id, colors, styles))
+          : renderLegacyData(data, entry.id, styles)
         }
 
         {/* Footer meta */}
@@ -170,84 +139,9 @@ export default function EntryDetailScreen() {
   );
 }
 
-function entryLocation(entry: { fields?: FieldDef[]; data: Record<string, any> }) {
-  const readLocation = (value: any): { lat: number; lng: number } | null => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-    const lat = Number(value.lat);
-    const lng = Number(value.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng };
-  };
-
-  if (entry.fields) {
-    for (const field of entry.fields) {
-      if (field.type !== 'gps') continue;
-      const location = readLocation(entry.data[field.id]);
-      if (location) return location;
-    }
-    return null;
-  }
-
-  return readLocation(entry.data.location);
-}
-
-function googleMapsUrl(lat: number, lng: number) {
-  return `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lng.toFixed(6)}`;
-}
-
-function googleMapsPointsUrl(points: MapPoint[], fallbackLat: number, fallbackLng: number) {
-  if (points.length < 2) return googleMapsUrl(fallbackLat, fallbackLng);
-
-  const ordered = points.slice(0, 10);
-  const origin = ordered[0].coordinate;
-  const destination = ordered[ordered.length - 1].coordinate;
-  const waypoints = ordered
-    .slice(1, -1)
-    .map((point) => `${point.coordinate.latitude.toFixed(6)},${point.coordinate.longitude.toFixed(6)}`)
-    .join('|');
-
-  const params = [
-    'api=1',
-    `origin=${origin.latitude.toFixed(6)},${origin.longitude.toFixed(6)}`,
-    `destination=${destination.latitude.toFixed(6)},${destination.longitude.toFixed(6)}`,
-    waypoints ? `waypoints=${encodeURIComponent(waypoints)}` : '',
-  ]
-    .filter(Boolean)
-    .join('&');
-
-  return `https://www.google.com/maps/dir/?${params}`;
-}
-
-function mapRegion(points: MapPoint[], fallback: { latitude: number; longitude: number }): Region {
-  if (points.length === 0) {
-    return {
-      ...fallback,
-      latitudeDelta: 0.035,
-      longitudeDelta: 0.035,
-    };
-  }
-
-  const lats = points.map((point) => point.coordinate.latitude);
-  const lngs = points.map((point) => point.coordinate.longitude);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const latDelta = Math.max((maxLat - minLat) * 1.45, 0.025);
-  const lngDelta = Math.max((maxLng - minLng) * 1.45, 0.025);
-
-  return {
-    latitude: (minLat + maxLat) / 2,
-    longitude: (minLng + maxLng) / 2,
-    latitudeDelta: latDelta,
-    longitudeDelta: lngDelta,
-  };
-}
-
 function renderField(
   field: FieldDef,
   value: any,
-  mapPoints: MapPoint[],
   currentEntryId: string,
   colors: AppColors,
   styles: AppStyles,
@@ -273,7 +167,6 @@ function renderField(
         <GpsSection
           key={field.id}
           location={isValidLocation ? value : undefined}
-          mapPoints={mapPoints}
           currentEntryId={currentEntryId}
         />
       );
@@ -328,7 +221,6 @@ function renderField(
 
 function renderLegacyData(
   data: Record<string, any>,
-  mapPoints: MapPoint[],
   currentEntryId: string,
   styles: AppStyles,
 ) {
@@ -345,7 +237,6 @@ function renderLegacyData(
         <GpsSection
           key={key}
           location={value as GpsLocation}
-          mapPoints={mapPoints}
           currentEntryId={currentEntryId}
         />
       );
@@ -401,11 +292,9 @@ function RatingSection({ label, rating, max }: { label: string; rating: number; 
 
 function GpsSection({
   location,
-  mapPoints,
   currentEntryId,
 }: {
   location: GpsLocation | undefined;
-  mapPoints: MapPoint[];
   currentEntryId: string;
 }) {
   const colors = useAppColors();
@@ -415,12 +304,7 @@ function GpsSection({
   const hasValidLocation = Number.isFinite(lat) && Number.isFinite(lng);
   const mapUrl = hasValidLocation ? staticMapUrl(lat, lng) : null;
   const [mapFailed, setMapFailed] = useState(false);
-  const [mapOpen, setMapOpen] = useState(false);
-  const currentCoordinate = { latitude: lat, longitude: lng };
-  const initialRegion = useMemo(
-    () => mapRegion(mapPoints, currentCoordinate),
-    [mapPoints, lat, lng]
-  );
+  const openMap = () => router.push(`/map/${currentEntryId}`);
 
   return (
     <View style={styles.gpsCard}>
@@ -439,7 +323,7 @@ function GpsSection({
           {mapUrl && !mapFailed ? (
             <TouchableOpacity
               style={styles.mapPreview}
-              onPress={() => setMapOpen(true)}
+              onPress={openMap}
               activeOpacity={0.86}
             >
               <Image
@@ -455,7 +339,7 @@ function GpsSection({
           ) : (
             <TouchableOpacity
               style={[styles.mapPreview, styles.mapPreviewEmpty]}
-              onPress={() => setMapOpen(true)}
+              onPress={openMap}
               activeOpacity={0.86}
             >
               <MaterialIcons name="map" size={30} color={colors.text.muted} />
@@ -464,60 +348,6 @@ function GpsSection({
               </Text>
             </TouchableOpacity>
           )}
-          <Modal
-            visible={mapOpen}
-            animationType="slide"
-            presentationStyle="pageSheet"
-            onRequestClose={() => setMapOpen(false)}
-          >
-            <View style={styles.mapModalRoot}>
-              <View style={styles.mapModalHeader}>
-                <View>
-                  <Text style={styles.mapModalTitle}>Locations</Text>
-                  <Text style={styles.mapModalSubtitle}>{mapPoints.length} points</Text>
-                </View>
-                <View style={styles.mapModalActions}>
-                  <TouchableOpacity
-                    style={styles.mapModalActionBtn}
-                    onPress={() => Linking.openURL(googleMapsUrl(lat, lng))}
-                  >
-                    <MaterialIcons name="open-in-new" size={20} color={colors.brand.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.mapModalClose} onPress={() => setMapOpen(false)}>
-                    <MaterialIcons name="close" size={22} color={colors.text.primary} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <MapView
-                style={styles.interactiveMap}
-                provider={PROVIDER_GOOGLE}
-                initialRegion={initialRegion}
-                mapType="standard"
-                loadingEnabled
-                loadingBackgroundColor={colors.background.app}
-                loadingIndicatorColor={colors.brand.primary}
-              >
-                {mapPoints.map((point) => (
-                  <Marker
-                    key={point.id}
-                    coordinate={point.coordinate}
-                    title={point.title}
-                    pinColor={point.id === currentEntryId ? colors.brand.primary : colors.text.secondary}
-                  />
-                ))}
-              </MapView>
-              <View style={styles.mapModalFooter}>
-                <TouchableOpacity
-                  style={styles.openMapsBtn}
-                  onPress={() => Linking.openURL(googleMapsPointsUrl(mapPoints, lat, lng))}
-                  activeOpacity={0.85}
-                >
-                  <MaterialIcons name="map" size={19} color={colors.text.inverse} />
-                  <Text style={styles.openMapsText}>Open in Google Maps</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
           <Text style={styles.gpsSub}>
             Accuracy{' '}
             {(() => {
@@ -736,77 +566,6 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '600',
     color: colors.text.muted,
     textAlign: 'center',
-  },
-  mapModalRoot: {
-    flex: 1,
-    backgroundColor: colors.background.app,
-  },
-  mapModalHeader: {
-    minHeight: 70,
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.section,
-    backgroundColor: colors.background.white,
-  },
-  mapModalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  mapModalSubtitle: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  mapModalActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  mapModalActionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background.soft,
-  },
-  mapModalClose: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background.soft,
-  },
-  interactiveMap: {
-    flex: 1,
-  },
-  mapModalFooter: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.section,
-    backgroundColor: colors.background.white,
-  },
-  openMapsBtn: {
-    minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: colors.brand.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  openMapsText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text.inverse,
   },
 
   // Photos
