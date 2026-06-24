@@ -14,7 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useAuthStore } from '../../store/authStore';
-import { colors } from '../../theme/colors';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 import ScreenBubbles from '../../components/ScreenBubbles';
 
 function GoogleLogo({ size = 34 }: { size?: number }) {
@@ -41,6 +42,8 @@ function GoogleLogo({ size = 34 }: { size?: number }) {
 }
 
 export default function LoginScreen() {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const signIn = useAuthStore((s) => s.signIn);
   const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
@@ -186,7 +189,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background.app,

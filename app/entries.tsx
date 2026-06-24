@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -9,6 +9,8 @@ import EntryCard from '../components/EntryCard';
 import Toast from '../components/Toast';
 import type { Entry } from '../types';
 import { getEntryDisplayNumbers } from '../utils/entryNumbering';
+import { AppColors } from '../theme/colors';
+import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 
 const SWIPE_ACTION_WIDTH = 80;
 const SNACKBAR_TIMEOUT_MS = 2600;
@@ -16,6 +18,8 @@ const TOAST_BOTTOM_OFFSET = 24;
 const LIST_BOTTOM_PADDING = 32;
 
 export default function EntriesScreen() {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const entries = useEntriesStore((s) => s.entries);
   const deleteEntry = useEntriesStore((s) => s.deleteEntry);
@@ -58,7 +62,7 @@ export default function EntriesScreen() {
           onPress={() => handleDelete(id)}
           activeOpacity={0.8}
         >
-          <MaterialIcons name="delete" size={24} color="#fff" />
+          <MaterialIcons name="delete" size={24} color={colors.text.inverse} />
           <Text style={styles.deleteLabel}>Delete</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -89,11 +93,11 @@ export default function EntriesScreen() {
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
+          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.screenTitle}>All entries</Text>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/export')}>
-          <MaterialIcons name="ios-share" size={23} color="#171d1b" />
+          <MaterialIcons name="ios-share" size={23} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
 
@@ -111,7 +115,7 @@ export default function EntriesScreen() {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <MaterialIcons name="inventory" size={46} color="#8EA8B8" />
+            <MaterialIcons name="inventory" size={46} color={colors.text.muted} />
             <Text style={styles.emptyTitle}>No entries yet</Text>
             <Text style={styles.emptyHint}>
               Tap "New entry" on the home screen to get started.
@@ -125,8 +129,8 @@ export default function EntriesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F7FBFE' },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background.app },
 
   topBar: {
     flexDirection: 'row',
@@ -146,7 +150,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: '500',
-    color: '#171d1b',
+    color: colors.text.primary,
     paddingLeft: 4,
   },
 
@@ -156,7 +160,7 @@ const styles = StyleSheet.create({
 
   countLabel: {
     fontSize: 12,
-    color: '#3f4946',
+    color: colors.text.secondary,
     fontWeight: '500',
     marginBottom: 12,
     marginTop: 2,
@@ -173,11 +177,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   emptyHint: {
     fontSize: 13,
-    color: '#3f4946',
+    color: colors.text.secondary,
     textAlign: 'center',
   },
 
@@ -189,7 +193,7 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     flex: 1,
-    backgroundColor: '#ba1a1a',
+    backgroundColor: colors.action.danger,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
@@ -198,7 +202,7 @@ const styles = StyleSheet.create({
   deleteLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.text.inverse,
     letterSpacing: 0.3,
   },
 

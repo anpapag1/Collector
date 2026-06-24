@@ -1,8 +1,10 @@
-import { memo, useState } from 'react';
+import React, { memo, useState } from 'react';
 import { View, Text, TouchableOpacity, Platform, StyleSheet } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef } from '../../types';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
 type Props = {
   field: FieldDef;
@@ -19,6 +21,8 @@ function formatIsoDate(iso: string): string {
 }
 
 function DateField({ field, value, onChange, error }: Props) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   if (field.auto) {
@@ -26,7 +30,7 @@ function DateField({ field, value, onChange, error }: Props) {
       <View>
         <Text style={styles.label}>{field.label}</Text>
         <View style={styles.autoBox}>
-          <MaterialIcons name="event" size={18} color="#3f4946" />
+          <MaterialIcons name="event" size={18} color={colors.text.secondary} />
           <Text style={styles.autoText}>{formatIsoDate(value) || '—'}</Text>
         </View>
       </View>
@@ -46,7 +50,7 @@ function DateField({ field, value, onChange, error }: Props) {
         onPress={() => setPickerOpen(true)}
         activeOpacity={0.7}
       >
-        <MaterialIcons name="event" size={18} color="#3f4946" />
+        <MaterialIcons name="event" size={18} color={colors.text.secondary} />
         <Text style={[styles.inputText, !value && styles.placeholderText]}>
           {value ? formatIsoDate(value) : 'Select a date'}
         </Text>
@@ -91,14 +95,14 @@ function DateField({ field, value, onChange, error }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginBottom: 7,
   },
-  required: { color: '#ba1a1a' },
+  required: { color: colors.text.danger },
   input: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -107,18 +111,18 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#B8C9D4',
-    backgroundColor: '#fff',
+    borderColor: colors.border.input,
+    backgroundColor: colors.background.white,
   },
-  inputError: { borderColor: '#ba1a1a' },
+  inputError: { borderColor: colors.text.danger },
   inputText: {
     fontSize: 15,
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   placeholderText: {
-    color: '#7a847f',
+    color: colors.text.placeholder,
   },
-  errorText: { fontSize: 12, color: '#ba1a1a', marginTop: 5 },
+  errorText: { fontSize: 12, color: colors.text.danger, marginTop: 5 },
   doneButton: {
     alignSelf: 'flex-end',
     paddingVertical: 8,
@@ -127,7 +131,7 @@ const styles = StyleSheet.create({
   doneButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#2589C8',
+    color: colors.brand.primary,
   },
   autoBox: {
     flexDirection: 'row',
@@ -136,12 +140,12 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#D2E4EF',
-    backgroundColor: '#F1F8FD',
+    borderColor: colors.border.default,
+    backgroundColor: colors.background.soft,
   },
   autoText: {
     fontSize: 15,
-    color: '#3f4946',
+    color: colors.text.secondary,
     fontWeight: '500',
   },
 });

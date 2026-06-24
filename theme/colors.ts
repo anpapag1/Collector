@@ -95,4 +95,100 @@ export const colors = {
   },
 } as const;
 
-export type AppColors = typeof colors;
+type DeepWiden<T> =
+  T extends readonly string[] ? readonly string[] :
+  T extends string ? string :
+  T extends object ? { [K in keyof T]: DeepWiden<T[K]> } :
+  T;
+
+export type AppColors = DeepWiden<typeof colors>;
+
+export const darkColors: AppColors = {
+  brand: {
+    primary: '#43B4F2',
+    primaryMid: '#2F9FDB',
+    primaryLight: '#78C9F4',
+    primaryDark: '#1D789F',
+    primarySoft: '#102E3D',
+    oldPrimary: '#43B4F2',
+    oldPrimaryStrong: '#2F9FDB',
+    oldPrimaryDark: '#1D789F',
+    oldPrimaryMuted: '#78C9F4',
+  },
+  background: {
+    app: '#050708',
+    muted: '#0B1115',
+    soft: '#101B21',
+    softGreen: '#101B21',
+    fieldSoft: '#111D24',
+    elevatedGreen: '#102E3D',
+    panelGreen: '#102E3D',
+    mutedGreen: '#183C4D',
+    successSoft: '#102E3D',
+    successPale: '#102E3D',
+    dangerSoft: '#35191D',
+    dangerPale: '#4A2026',
+    warningSoft: '#3A3020',
+    white: '#101B21',
+    transparent: 'transparent',
+  },
+  text: {
+    primary: '#F4F8FA',
+    secondary: '#B2C1C9',
+    muted: '#78909C',
+    subtle: '#78909C',
+    placeholder: '#81949E',
+    inverse: '#FFFFFF',
+    brand: '#43B4F2',
+    oldBrand: '#43B4F2',
+    brandDark: '#78C9F4',
+    danger: '#FFB4AB',
+    dangerDark: '#FFDAD6',
+    checkDark: '#E5F6FF',
+    warning: '#FFD166',
+  },
+  border: {
+    default: '#203744',
+    muted: '#294652',
+    input: '#385461',
+    soft: '#172A33',
+    softGreen: '#1D3B49',
+    section: '#18313D',
+    formSection: '#1D3B49',
+    divider: '#1A2A32',
+    success: '#24526A',
+    successMuted: '#1D3B49',
+    image: '#385461',
+    disabled: '#5E747F',
+    ratingEmpty: '#445B66',
+  },
+  action: {
+    primary: '#2FA9E8',
+    primaryGradient: ['#124D68', '#167DAA', '#2FA9E8'],
+    delete: '#D84955',
+    danger: '#FF6B76',
+    disabled: '#5E747F',
+    folderAccent: '#1B4253',
+  },
+  shadow: {
+    black: '#000000',
+    brand: '#000000',
+    hero: '#000000',
+  },
+  overlay: {
+    scrim: 'rgba(0,0,0,0.68)',
+    imageScrim: 'rgba(0,0,0,0.72)',
+    heroBubbleStrong: 'rgba(255,255,255,0.08)',
+    heroBubbleSoft: 'rgba(255,255,255,0.05)',
+    heroButton: 'rgba(255,255,255,0.12)',
+    heroButtonBorder: 'rgba(255,255,255,0.18)',
+    heroLogo: 'rgba(255,255,255,0.14)',
+    toast: 'rgba(232,244,250,0.94)',
+    toastText: 'rgba(8,15,19,0.95)',
+    toastIcon: 'rgba(19,113,151,0.95)',
+    toastClose: 'rgba(8,15,19,0.45)',
+  },
+  toast: {
+    accent: '#43B4F2',
+  },
+};

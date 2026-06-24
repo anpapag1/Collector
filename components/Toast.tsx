@@ -1,6 +1,8 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { AppColors } from '../theme/colors';
+import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 
 type Props = {
   message: string | null;
@@ -11,6 +13,8 @@ type Props = {
 };
 
 export default function Toast({ message, onDismiss, bottom = 32, icon = 'check-circle', action }: Props) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(10)).current;
 
@@ -37,21 +41,21 @@ export default function Toast({ message, onDismiss, bottom = 32, icon = 'check-c
       accessibilityLiveRegion="polite"
     >
       <TouchableOpacity style={styles.pill} onPress={onDismiss} activeOpacity={0.75}>
-        <MaterialIcons name={icon} size={15} color="rgba(131,213,198,0.9)" />
+        <MaterialIcons name={icon} size={15} color={colors.overlay.toastIcon} />
         <Text style={styles.text} numberOfLines={2}>{message}</Text>
         {action ? (
           <TouchableOpacity onPress={action.onPress} hitSlop={8}>
             <Text style={styles.actionText}>{action.label}</Text>
           </TouchableOpacity>
         ) : (
-          <MaterialIcons name="close" size={14} color="rgba(255,255,255,0.45)" />
+          <MaterialIcons name="close" size={14} color={colors.overlay.toastClose} />
         )}
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   wrap: {
     position: 'absolute',
     left: 0,
@@ -64,12 +68,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(23,29,27,0.82)',
+    backgroundColor: colors.overlay.toast,
     paddingHorizontal: 16,
     paddingVertical: 11,
     borderRadius: 100,
     maxWidth: 320,
-    shadowColor: '#000',
+    shadowColor: colors.shadow.black,
     shadowOpacity: 0.22,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -79,11 +83,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '500',
-    color: 'rgba(238,241,238,0.95)',
+    color: colors.overlay.toastText,
   },
   actionText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#83d5c6',
+    color: colors.toast.accent,
   },
 });

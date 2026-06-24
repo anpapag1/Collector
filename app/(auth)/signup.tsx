@@ -14,10 +14,13 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/authStore';
-import { colors } from '../../theme/colors';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 import ScreenBubbles from '../../components/ScreenBubbles';
 
 export default function SignupScreen() {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const signUp = useAuthStore((s) => s.signUp);
   const loading = useAuthStore((s) => s.loading);
@@ -198,7 +201,7 @@ export default function SignupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background.app,

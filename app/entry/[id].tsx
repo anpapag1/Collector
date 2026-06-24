@@ -18,6 +18,8 @@ import { useEntriesStore } from '../../store/entriesStore';
 import { formatDate, timeAgo } from '../../utils/timeUtils';
 import { FieldDef, PhotoItem, GpsLocation } from '../../types';
 import { selectValueLabel } from '../../utils/formLogic';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 import { getEntryDisplayNumbers } from '../../utils/entryNumbering';
 import { colors } from '../../theme/colors';
 
@@ -50,6 +52,8 @@ function staticMapUrl(lat: number, lng: number) {
 }
 
 export default function EntryDetailScreen() {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const entries = useEntriesStore((s) => s.entries);
@@ -57,18 +61,6 @@ export default function EntryDetailScreen() {
 
   const entry = entries.find((e) => e.id === id);
   const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
-
-  if (!entry) {
-    return (
-      <View style={[styles.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
-        <MaterialIcons name="inventory" size={40} color="#8EA8B8" />
-        <Text style={styles.notFound}>Entry not found</Text>
-      </View>
-    );
-  }
-
-  const { data, createdAt, formTitle, fields } = entry;
-  const displayNumber = displayNumbers.get(entry.id) ?? 0;
   const mapPoints = useMemo(
     () =>
       entries
@@ -88,6 +80,18 @@ export default function EntryDetailScreen() {
         .filter((point): point is MapPoint => !!point),
     [entries, displayNumbers]
   );
+
+  if (!entry) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+        <MaterialIcons name="inventory" size={40} color={colors.text.muted} />
+        <Text style={styles.notFound}>Entry not found</Text>
+      </View>
+    );
+  }
+
+  const { data, createdAt, formTitle, fields } = entry;
+  const displayNumber = displayNumbers.get(entry.id) ?? 0;
 
   const handleDelete = () => {
     Alert.alert(
@@ -112,20 +116,20 @@ export default function EntryDetailScreen() {
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
+          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.topLabel}>Entry #{String(displayNumber).padStart(2, '0')}</Text>
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={() => router.push(`/edit-entry/${entry.id}`)}
         >
-          <MaterialIcons name="edit" size={22} color="#3f4946" />
+          <MaterialIcons name="edit" size={22} color={colors.text.secondary} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.iconBtn, styles.deleteBtn]}
           onPress={handleDelete}
         >
-          <MaterialIcons name="delete-outline" size={22} color="#ba1a1a" />
+          <MaterialIcons name="delete-outline" size={22} color={colors.text.danger} />
         </TouchableOpacity>
       </View>
 
@@ -139,7 +143,7 @@ export default function EntryDetailScreen() {
           <View style={styles.headerTop}>
             {formTitle ? (
               <View style={styles.formChip}>
-                <MaterialIcons name="description" size={13} color="#2589C8" />
+                <MaterialIcons name="description" size={13} color={colors.brand.primary} />
                 <Text style={styles.formChipText}>{formTitle}</Text>
               </View>
             ) : null}
@@ -150,8 +154,8 @@ export default function EntryDetailScreen() {
 
         {/* Dynamic fields */}
         {fields
-          ? fields.map((field) => renderField(field, data[field.id], mapPoints, entry.id))
-          : renderLegacyData(data, mapPoints, entry.id)
+          ? fields.map((field) => renderField(field, data[field.id], mapPoints, entry.id, colors, styles))
+          : renderLegacyData(data, mapPoints, entry.id, styles)
         }
 
         {/* Footer meta */}
@@ -240,7 +244,14 @@ function mapRegion(points: MapPoint[], fallback: { latitude: number; longitude: 
   };
 }
 
-function renderField(field: FieldDef, value: any, mapPoints: MapPoint[], currentEntryId: string) {
+function renderField(
+  field: FieldDef,
+  value: any,
+  mapPoints: MapPoint[],
+  currentEntryId: string,
+  colors: AppColors,
+  styles: AppStyles,
+) {
   if (value === undefined || value === null) return null;
 
   switch (field.type) {
@@ -272,8 +283,8 @@ function renderField(field: FieldDef, value: any, mapPoints: MapPoint[], current
     case 'boolean':
       return (
         <FieldRow key={field.id} label={field.label}>
-          <View style={[styles.boolChip, { backgroundColor: value ? '#EAF6FD' : '#f2dada' }]}>
-            <Text style={[styles.boolChipText, { color: value ? '#17689B' : '#7a0010' }]}>
+          <View style={[styles.boolChip, { backgroundColor: value ? colors.background.successSoft : colors.background.dangerPale }]}>
+            <Text style={[styles.boolChipText, { color: value ? colors.text.brandDark : colors.text.dangerDark }]}>
               {value ? 'Yes' : 'No'}
             </Text>
           </View>
@@ -315,7 +326,12 @@ function renderField(field: FieldDef, value: any, mapPoints: MapPoint[], current
   }
 }
 
-function renderLegacyData(data: Record<string, any>, mapPoints: MapPoint[], currentEntryId: string) {
+function renderLegacyData(
+  data: Record<string, any>,
+  mapPoints: MapPoint[],
+  currentEntryId: string,
+  styles: AppStyles,
+) {
   return Object.entries(data).map(([key, value]) => {
     if (value === null || value === undefined) return null;
 
@@ -353,6 +369,7 @@ function prettyKey(key: string) {
 }
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.fieldCard}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -362,6 +379,8 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 function RatingSection({ label, rating, max }: { label: string; rating: number; max: number }) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.fieldCard}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -371,7 +390,7 @@ function RatingSection({ label, rating, max }: { label: string; rating: number; 
             key={i}
             name={i < rating ? 'star' : 'star-border'}
             size={22}
-            color={i < rating ? '#2589C8' : '#C4D1D8'}
+            color={i < rating ? colors.brand.primary : colors.border.ratingEmpty}
           />
         ))}
         <Text style={styles.ratingNum}>{rating}/{max}</Text>
@@ -389,6 +408,8 @@ function GpsSection({
   mapPoints: MapPoint[];
   currentEntryId: string;
 }) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const lat = location ? Number(location.lat) : NaN;
   const lng = location ? Number(location.lng) : NaN;
   const hasValidLocation = Number.isFinite(lat) && Number.isFinite(lng);
@@ -513,6 +534,7 @@ function GpsSection({
 }
 
 function PhotoSection({ label, photos }: { label: string; photos: PhotoItem[] }) {
+  const styles = useThemedStyles(createStyles);
   if (!photos.length) return null;
   return (
     <View style={styles.fieldCard}>
@@ -528,8 +550,8 @@ function PhotoSection({ label, photos }: { label: string; photos: PhotoItem[] })
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F7FBFE' },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background.app },
 
   topBar: {
     flexDirection: 'row',
@@ -545,17 +567,17 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   deleteBtn: {
-    backgroundColor: '#fdf2f2',
+    backgroundColor: colors.background.dangerSoft,
   },
   topLabel: {
     flex: 1,
     fontSize: 17,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
     textAlign: 'center',
   },
 
-  notFound: { fontSize: 15, color: '#3f4946', marginTop: 12 },
+  notFound: { fontSize: 15, color: colors.text.secondary, marginTop: 12 },
 
   scroll: { flex: 1 },
   scrollContent: {
@@ -566,7 +588,7 @@ const styles = StyleSheet.create({
 
   // Header card
   headerCard: {
-    backgroundColor: '#EAF6FD',
+    backgroundColor: colors.background.elevatedGreen,
     borderRadius: 18,
     padding: 16,
     gap: 4,
@@ -580,7 +602,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#EAF6FD',
+    backgroundColor: colors.background.elevatedGreen,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 100,
@@ -588,26 +610,26 @@ const styles = StyleSheet.create({
   formChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#17689B',
+    color: colors.text.brandDark,
   },
   headerAgo: {
     fontSize: 12,
-    color: '#3f4946',
+    color: colors.text.secondary,
   },
   headerDate: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#171d1b',
+    color: colors.text.primary,
     marginTop: 4,
   },
 
   // Field card
   fieldCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.white,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E3F0F8',
+    borderColor: colors.border.soft,
     gap: 8,
   },
   fieldLabel: {
@@ -615,11 +637,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    color: '#3f4946',
+    color: colors.text.secondary,
   },
   fieldValue: {
     fontSize: 15,
-    color: '#171d1b',
+    color: colors.text.primary,
     lineHeight: 22,
   },
 
@@ -644,7 +666,7 @@ const styles = StyleSheet.create({
   ratingNum: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginLeft: 6,
   },
 
@@ -798,7 +820,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#E1EEF7',
+    backgroundColor: colors.border.section,
   },
   photoImage: { width: '100%', height: '100%' },
 
@@ -812,11 +834,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   metaKey: {
-    color: '#3f4946',
+    color: colors.text.secondary,
     fontWeight: '500',
   },
   metaMono: {
-    color: '#171d1b',
+    color: colors.text.primary,
     fontFamily: 'monospace',
   },
 });
+
+type AppStyles = ReturnType<typeof createStyles>;

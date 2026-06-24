@@ -3,18 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, Image } from 'react-na
 import { MaterialIcons } from '@expo/vector-icons';
 import { Entry, PhotoItem } from '../types';
 import { timeAgo } from '../utils/timeUtils';
-import { colors } from '../theme/colors';
+import { AppColors } from '../theme/colors';
+import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import { useAuthStore } from '../store/authStore';
-
-const SYNC_STATUS_META: Record<
-  string,
-  { icon: keyof typeof MaterialIcons.glyphMap; color: string }
-> = {
-  pending: { icon: 'cloud-queue', color: colors.text.muted },
-  syncing: { icon: 'cloud-upload', color: colors.brand.primary },
-  synced: { icon: 'cloud-done', color: colors.brand.primary },
-  error: { icon: 'cloud-off', color: colors.action.delete },
-};
 
 type Props = {
   entry: Entry;
@@ -25,6 +16,17 @@ type Props = {
 };
 
 function EntryCard({ entry, displayNumber, onOpen }: Props) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
+  const syncStatusMeta: Record<
+    string,
+    { icon: keyof typeof MaterialIcons.glyphMap; color: string }
+  > = {
+    pending: { icon: 'cloud-queue', color: colors.text.muted },
+    syncing: { icon: 'cloud-upload', color: colors.brand.primary },
+    synced: { icon: 'cloud-done', color: colors.brand.primary },
+    error: { icon: 'cloud-off', color: colors.action.delete },
+  };
   const { createdAt, formTitle, fields, data } = entry;
   const displayLabel = `#${String(displayNumber).padStart(2, '0')}`;
 
@@ -88,7 +90,7 @@ function EntryCard({ entry, displayNumber, onOpen }: Props) {
   const totalFields = fields ? fields.length : Object.keys(data).length;
 
   const signedIn = useAuthStore((s) => !!s.session);
-  const syncMeta = signedIn && entry.syncStatus ? SYNC_STATUS_META[entry.syncStatus] : null;
+  const syncMeta = signedIn && entry.syncStatus ? syncStatusMeta[entry.syncStatus] : null;
 
   const handleSyncBadgePress = () => {
     if (entry.syncStatus === 'error' && entry.syncError) {
@@ -163,7 +165,7 @@ function EntryCard({ entry, displayNumber, onOpen }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',

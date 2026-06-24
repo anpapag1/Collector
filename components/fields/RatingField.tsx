@@ -1,7 +1,9 @@
-import { memo } from 'react';
+import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef } from '../../types';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
 type Props = {
   field: FieldDef;
@@ -11,6 +13,8 @@ type Props = {
 };
 
 function RatingField({ field, value, onChange, error }: Props) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const max = field.max ?? 5;
 
   return (
@@ -25,7 +29,7 @@ function RatingField({ field, value, onChange, error }: Props) {
             <MaterialIcons
               name={n <= value ? 'star' : 'star-border'}
               size={34}
-              color={n <= value ? '#2589C8' : '#C4D1D8'}
+              color={n <= value ? colors.brand.primary : colors.border.ratingEmpty}
             />
           </TouchableOpacity>
         ))}
@@ -35,19 +39,19 @@ function RatingField({ field, value, onChange, error }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginBottom: 9,
   },
-  required: { color: '#ba1a1a' },
+  required: { color: colors.text.danger },
   stars: {
     flexDirection: 'row',
     gap: 8,
   },
-  errorText: { fontSize: 12, color: '#ba1a1a', marginTop: 6 },
+  errorText: { fontSize: 12, color: colors.text.danger, marginTop: 6 },
 });
 
 export default memo(RatingField);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,12 +18,16 @@ import { File, Paths } from 'expo-file-system';
 import { useFormStore } from '../store/formStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { captureLocation } from '../utils/sensors';
+import { AppColors } from '../theme/colors';
+import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import { PhotoItem } from '../types';
 import Toast from '../components/Toast';
 import DynamicForm from '../components/DynamicForm';
 import { isFieldFilled, isFieldVisible } from '../utils/formLogic';
 
 export default function CollectScreen() {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const schema = useFormStore((s) => s.schema);
   const { draft, draftFormId, gpsStatus, setField, setGpsStatus, resetDraft, showErrors, setShowErrors } =
@@ -170,18 +174,18 @@ export default function CollectScreen() {
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-            <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
+            <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.screenTitle}>New entry</Text>
         </View>
         <View style={styles.noFormState}>
-          <MaterialIcons name="file-present" size={56} color="#8EA8B8" />
+          <MaterialIcons name="file-present" size={56} color={colors.text.muted} />
           <Text style={styles.noFormTitle}>No form loaded</Text>
           <Text style={styles.noFormHint}>
             Go back and load a form before collecting entries.
           </Text>
           <TouchableOpacity style={styles.noFormBtn} onPress={() => router.back()}>
-            <MaterialIcons name="arrow-back" size={20} color="#fff" />
+            <MaterialIcons name="arrow-back" size={20} color={colors.text.inverse} />
             <Text style={styles.noFormBtnText}>Back to home</Text>
           </TouchableOpacity>
         </View>
@@ -199,7 +203,7 @@ export default function CollectScreen() {
         {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.iconBtn} onPress={handleBack}>
-            <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
+            <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <View style={styles.topCenter}>
             <Text style={styles.screenTitle}>New entry</Text>
@@ -250,7 +254,7 @@ export default function CollectScreen() {
             activeOpacity={0.85}
             disabled={savedFlash}
           >
-            <MaterialIcons name="check" size={22} color="#fff" />
+            <MaterialIcons name="check" size={22} color={colors.text.inverse} />
             <Text style={styles.saveBtnText}>Save entry</Text>
           </TouchableOpacity>
         </View>
@@ -283,7 +287,7 @@ export default function CollectScreen() {
               onPress={() => pickImage(item.source)}
             >
               <View style={styles.sheetIconCircle}>
-                <MaterialIcons name={item.icon} size={22} color="#2589C8" />
+                <MaterialIcons name={item.icon} size={22} color={colors.brand.primary} />
               </View>
               <Text style={styles.sheetItemText}>{item.label}</Text>
             </TouchableOpacity>
@@ -309,8 +313,8 @@ export default function CollectScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F7FBFE' },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background.app },
   inner: { flex: 1 },
 
   topBar: {
@@ -333,11 +337,11 @@ const styles = StyleSheet.create({
   screenTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   formNameSub: {
     fontSize: 12,
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginTop: 1,
   },
 
@@ -351,19 +355,19 @@ const styles = StyleSheet.create({
   progressTrack: {
     flex: 1,
     height: 4,
-    backgroundColor: '#D8ECFA',
+    backgroundColor: colors.background.mutedGreen,
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#2589C8',
+    backgroundColor: colors.action.primary,
     borderRadius: 2,
   },
   progressLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2589C8',
+    color: colors.brand.primary,
     minWidth: 28,
     textAlign: 'right',
   },
@@ -390,8 +394,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
     borderRadius: 18,
-    backgroundColor: '#2589C8',
-    shadowColor: '#17689B',
+    backgroundColor: colors.action.primary,
+    shadowColor: colors.shadow.brand,
     shadowOpacity: 0.28,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
@@ -400,10 +404,10 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text.inverse,
   },
   saveBtnDisabled: {
-    backgroundColor: '#62B3E5',
+    backgroundColor: colors.brand.primaryLight,
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -411,7 +415,7 @@ const styles = StyleSheet.create({
 
   scrim: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.42)',
+    backgroundColor: colors.overlay.scrim,
     zIndex: 30,
   },
   sheet: {
@@ -420,7 +424,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 31,
-    backgroundColor: '#F7FBFE',
+    backgroundColor: colors.background.app,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 10,
@@ -430,12 +434,12 @@ const styles = StyleSheet.create({
     width: 34,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#B8C9D4',
+    backgroundColor: colors.border.muted,
     alignSelf: 'center',
     marginBottom: 12,
   },
   sheetHeader: { paddingHorizontal: 22, paddingBottom: 8 },
-  sheetTitle: { fontSize: 18, fontWeight: '600', color: '#171d1b' },
+  sheetTitle: { fontSize: 18, fontWeight: '600', color: colors.text.primary },
   sheetItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -449,11 +453,11 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#EAF6FD',
+    backgroundColor: colors.background.elevatedGreen,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sheetItemText: { fontSize: 15, fontWeight: '500', color: '#171d1b' },
+  sheetItemText: { fontSize: 15, fontWeight: '500', color: colors.text.primary },
 
 
   noFormState: {
@@ -463,8 +467,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     gap: 12,
   },
-  noFormTitle: { fontSize: 20, fontWeight: '600', color: '#171d1b', marginTop: 4 },
-  noFormHint: { fontSize: 14, color: '#3f4946', textAlign: 'center', lineHeight: 21 },
+  noFormTitle: { fontSize: 20, fontWeight: '600', color: colors.text.primary, marginTop: 4 },
+  noFormHint: { fontSize: 14, color: colors.text.secondary, textAlign: 'center', lineHeight: 21 },
   noFormBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -473,7 +477,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: '#2589C8',
+    backgroundColor: colors.action.primary,
   },
-  noFormBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  noFormBtnText: { fontSize: 15, fontWeight: '600', color: colors.text.inverse },
 });

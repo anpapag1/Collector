@@ -1,7 +1,9 @@
-import { memo } from 'react';
+import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef } from '../../types';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
 type Props = {
   field: FieldDef;
@@ -11,6 +13,8 @@ type Props = {
 };
 
 function BooleanField({ field, value, onChange, error }: Props) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   return (
     <View>
       <Text style={styles.label}>
@@ -27,7 +31,7 @@ function BooleanField({ field, value, onChange, error }: Props) {
           <MaterialIcons
             name="check"
             size={18}
-            color={value === true ? '#fff' : '#3f4946'}
+            color={value === true ? colors.text.inverse : colors.text.secondary}
           />
           <Text style={[styles.optionText, value === true && styles.optionTextActive]}>
             Yes
@@ -42,7 +46,7 @@ function BooleanField({ field, value, onChange, error }: Props) {
           <MaterialIcons
             name="close"
             size={18}
-            color={value === false ? '#fff' : '#3f4946'}
+            color={value === false ? colors.text.inverse : colors.text.secondary}
           />
           <Text style={[styles.optionText, value === false && styles.optionTextActive]}>
             No
@@ -55,15 +59,15 @@ function BooleanField({ field, value, onChange, error }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginBottom: 7,
   },
   required: {
-    color: '#ba1a1a',
+    color: colors.text.danger,
   },
   row: {
     flexDirection: 'row',
@@ -78,28 +82,28 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#B8C9D4',
-    backgroundColor: '#fff',
+    borderColor: colors.border.input,
+    backgroundColor: colors.background.white,
   },
   optionActiveYes: {
-    backgroundColor: '#2589C8',
-    borderColor: '#2589C8',
+    backgroundColor: colors.action.primary,
+    borderColor: colors.action.primary,
   },
   optionActiveNo: {
-    backgroundColor: '#ba1a1a',
-    borderColor: '#ba1a1a',
+    backgroundColor: colors.action.danger,
+    borderColor: colors.action.danger,
   },
   optionText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#3f4946',
+    color: colors.text.secondary,
   },
   optionTextActive: {
-    color: '#fff',
+    color: colors.text.inverse,
   },
   errorText: {
     fontSize: 12,
-    color: '#ba1a1a',
+    color: colors.text.danger,
     marginTop: 5,
   },
 });

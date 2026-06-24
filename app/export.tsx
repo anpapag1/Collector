@@ -12,7 +12,8 @@ import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEntriesStore } from '../store/entriesStore';
 import { useFormStore } from '../store/formStore';
-import { colors } from '../theme/colors';
+import { AppColors } from '../theme/colors';
+import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import {
   buildAndExport,
   buildCsvExport,
@@ -24,6 +25,8 @@ type Phase = 'summary' | 'building' | 'done';
 type ExportKind = 'zip' | 'csv';
 
 export default function ExportScreen() {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const entries = useEntriesStore((s) => s.entries);
   const schema = useFormStore((s) => s.schema);
@@ -136,7 +139,7 @@ export default function ExportScreen() {
           <>
             {error && (
               <View style={styles.errorBox}>
-                <MaterialIcons name="error-outline" size={18} color="#ba1a1a" />
+                <MaterialIcons name="error-outline" size={18} color={colors.text.danger} />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -281,7 +284,7 @@ export default function ExportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background.app },
 
   topBar: {

@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { colors } from '../theme/colors';
+import { AppColors } from '../theme/colors';
+import { useThemedStyles } from '../theme/useAppColors';
 
 export default function ScreenBubbles() {
+  const styles = useThemedStyles(createStyles);
   return (
     <View pointerEvents="none" style={styles.root}>
       <View style={[styles.bubble, styles.bubbleLarge]} />
@@ -12,7 +14,7 @@ export default function ScreenBubbles() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFill,
     overflow: 'hidden',

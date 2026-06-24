@@ -1,8 +1,10 @@
-import { memo } from 'react';
+import React, { memo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef, OtherValue, SelectValue } from '../../types';
 import { isOtherValue } from '../../utils/formLogic';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
 type Props = {
   field: FieldDef;
@@ -14,6 +16,8 @@ type Props = {
 const OTHER_LABEL = 'Other';
 
 function SelectField({ field, value, onChange, error }: Props) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const multi = !!field.multiple;
   const selected: SelectValue[] = multi
     ? Array.isArray(value) ? value : []
@@ -83,7 +87,7 @@ function SelectField({ field, value, onChange, error }: Props) {
               activeOpacity={0.7}
             >
               {isSelected && (
-                <MaterialIcons name="check" size={15} color="#00201c" />
+                <MaterialIcons name="check" size={15} color={colors.text.checkDark} />
               )}
               <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
                 {opt}
@@ -99,7 +103,7 @@ function SelectField({ field, value, onChange, error }: Props) {
             activeOpacity={0.7}
           >
             {otherSelected && (
-              <MaterialIcons name="check" size={15} color="#00201c" />
+              <MaterialIcons name="check" size={15} color={colors.text.checkDark} />
             )}
             <Text style={[styles.chipText, otherSelected && styles.chipTextSelected]}>
               {OTHER_LABEL}
@@ -114,7 +118,7 @@ function SelectField({ field, value, onChange, error }: Props) {
           value={otherEntry?.otherText ?? ''}
           onChangeText={setOtherText}
           placeholder="Please specify…"
-          placeholderTextColor="#7a847f"
+          placeholderTextColor={colors.text.placeholder}
           multiline
         />
       )}
@@ -124,7 +128,7 @@ function SelectField({ field, value, onChange, error }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -134,13 +138,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3f4946',
+    color: colors.text.secondary,
   },
-  required: { color: '#ba1a1a' },
+  required: { color: colors.text.danger },
   count: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2589C8',
+    color: colors.brand.primary,
   },
   chips: {
     flexDirection: 'row',
@@ -155,34 +159,34 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: '#B8C9D4',
+    borderColor: colors.border.input,
     backgroundColor: 'transparent',
   },
   chipSelected: {
     borderColor: 'transparent',
-    backgroundColor: '#BDE6FA',
+    backgroundColor: colors.action.folderAccent,
   },
   chipText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#3f4946',
+    color: colors.text.secondary,
   },
   chipTextSelected: {
-    color: '#00201c',
+    color: colors.text.checkDark,
   },
   otherInput: {
     marginTop: 10,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#B8C9D4',
-    backgroundColor: '#fff',
+    borderColor: colors.border.input,
+    backgroundColor: colors.background.white,
     fontSize: 14,
-    color: '#171d1b',
+    color: colors.text.primary,
     minHeight: 44,
     textAlignVertical: 'top',
   },
-  errorText: { fontSize: 12, color: '#ba1a1a', marginTop: 6 },
+  errorText: { fontSize: 12, color: colors.text.danger, marginTop: 6 },
 });
 
 export default memo(SelectField);

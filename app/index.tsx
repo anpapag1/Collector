@@ -31,6 +31,9 @@ import { FormConfig } from '../types';
 import { loadBundledConfig, loadFromPath } from '../utils/schemaLoader';
 import { getEntryDisplayNumbers } from '../utils/entryNumbering';
 import { requestSync } from '../services/syncEngine';
+import { AppColors } from '../theme/colors';
+import { useAppColors, useThemedStyles } from '../theme/useAppColors';
+import { useThemeStore } from '../store/themeStore';
 
 type FormPreset = {
   id: string;
@@ -59,6 +62,9 @@ const FORM_SWIPE_ACTION_WIDTH = 168;
 const ACTIVE_FORM_SWIPE_ACTION_WIDTH = 104;
 
 export default function HomeScreen() {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
+  const isDark = useThemeStore((state) => state.mode === 'dark');
   const insets = useSafeAreaInsets();
   const schema = useFormStore((s) => s.schema);
   const loadSchema = useFormStore((s) => s.loadSchema);
@@ -178,7 +184,7 @@ export default function HomeScreen() {
           onPress={() => handleDeleteEntry(id)}
           activeOpacity={0.8}
         >
-          <MaterialIcons name="delete" size={24} color="#fff" />
+          <MaterialIcons name="delete" size={24} color={colors.text.inverse} />
           <Text style={styles.deleteLabel}>Delete</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -277,7 +283,7 @@ export default function HomeScreen() {
           onPress={() => downloadPreset(preset)}
           activeOpacity={0.8}
         >
-          <MaterialIcons name="download" size={20} color="#fff" />
+          <MaterialIcons name="download" size={20} color={colors.text.inverse} />
           <Text style={styles.actionLabel}>Save</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -285,7 +291,7 @@ export default function HomeScreen() {
           onPress={() => deletePreset(preset.id)}
           activeOpacity={0.8}
         >
-          <MaterialIcons name="delete" size={20} color="#fff" />
+          <MaterialIcons name="delete" size={20} color={colors.text.inverse} />
           <Text style={styles.actionLabel}>Delete</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -332,7 +338,7 @@ export default function HomeScreen() {
           }}
           activeOpacity={0.8}
         >
-          <MaterialIcons name="ios-share" size={21} color="#fff" />
+          <MaterialIcons name="ios-share" size={21} color={colors.text.inverse} />
           <Text style={styles.actionLabel}>Export</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -352,7 +358,7 @@ export default function HomeScreen() {
           onPress={handleDeleteAllEntries}
           activeOpacity={0.8}
         >
-          <MaterialIcons name="delete-sweep" size={21} color="#fff" />
+          <MaterialIcons name="delete-sweep" size={21} color={colors.text.inverse} />
           <Text style={styles.actionLabel}>Delete All</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -384,7 +390,11 @@ export default function HomeScreen() {
       <View style={[styles.body, { paddingBottom: insets.bottom + 104 }]}>
         {/* Hero header */}
         <LinearGradient
-          colors={['#17689B', '#2589C8', '#62B3E5']}
+          colors={
+            isDark
+              ? ['#050708', '#0B2633', '#124D68']
+              : [colors.brand.primaryDark, colors.brand.primary, colors.brand.primaryLight]
+          }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.hero, { paddingTop: insets.top + 18 }]}
@@ -422,7 +432,7 @@ export default function HomeScreen() {
             onPress={() => router.push('/settings')}
             activeOpacity={0.78}
           >
-            <MaterialIcons name="settings" size={18} color="#fff" />
+            <MaterialIcons name="settings" size={18} color={colors.text.inverse} />
           </TouchableOpacity>
           <View style={styles.heroBrand}>
             {/* <View style={styles.heroLogoMark}> */}
@@ -448,7 +458,7 @@ export default function HomeScreen() {
             <MaterialIcons
               name={schema ? 'description' : 'file-present'}
               size={20}
-              color={schema ? '#2589C8' : '#8EA8B8'}
+              color={schema ? colors.brand.primary : colors.text.muted}
             />
             <View style={styles.formBtnBody}>
               <Text style={styles.formLabel}>Active form</Text>
@@ -458,7 +468,7 @@ export default function HomeScreen() {
                 <Text style={styles.formTitleEmpty}>No form loaded</Text>
               )}
             </View>
-            <MaterialIcons name="settings" size={20} color={schema ? '#3f4946' : '#8EA8B8'} />
+            <MaterialIcons name="settings" size={20} color={schema ? colors.text.secondary : colors.text.muted} />
           </TouchableOpacity>
         </Swipeable>
 
@@ -473,7 +483,7 @@ export default function HomeScreen() {
         {/* Empty state */}
         {total === 0 && (
           <View style={styles.empty}>
-            <MaterialIcons name="inventory" size={46} color="#8EA8B8" />
+            <MaterialIcons name="inventory" size={46} color={colors.text.muted} />
             <Text style={styles.emptyTitle}>No entries yet</Text>
             <Text style={styles.emptyHint}>Tap "New entry" to collect your first record.</Text>
           </View>
@@ -517,7 +527,7 @@ export default function HomeScreen() {
         }}
         activeOpacity={schema ? 0.85 : 1}
       >
-        <MaterialIcons name="add" size={24} color="#fff" />
+        <MaterialIcons name="add" size={24} color={colors.text.inverse} />
         <Text style={styles.fabText}>New entry</Text>
       </TouchableOpacity>
 
@@ -560,27 +570,27 @@ export default function HomeScreen() {
                       onPress={() => pickPreset(preset)}
                       activeOpacity={0.78}
                     >
-                      <MaterialIcons name="description" size={22} color="#2589C8" />
+                      <MaterialIcons name="description" size={22} color={colors.brand.primary} />
                       <View style={styles.sheetItemBody}>
                         <Text style={styles.sheetItemTitle}>{preset.config.formTitle}</Text>
                         <Text style={styles.sheetItemSub}>
                           {preset.config.fields.length} fields
                         </Text>
                       </View>
-                      {isActive && <MaterialIcons name="check-circle" size={22} color="#2589C8" />}
+                      {isActive && <MaterialIcons name="check-circle" size={22} color={colors.brand.primary} />}
                     </TouchableOpacity>
                   </Swipeable>
                 );
               })
             ) : (
               <View style={styles.emptyForms}>
-                <MaterialIcons name="delete-forever" size={34} color="#8EA8B8" />
+                <MaterialIcons name="delete-forever" size={34} color={colors.text.muted} />
                 <Text style={styles.emptyFormsTitle}>No saved forms</Text>
                 <Text style={styles.emptyFormsHint}>Use device files to load a new form config.</Text>
               </View>
             )}
             <TouchableOpacity style={[styles.sheetItem, styles.sheetDivider]} onPress={browseFiles}>
-              <MaterialIcons name="folder-open" size={22} color="#3f4946" />
+              <MaterialIcons name="folder-open" size={22} color={colors.text.secondary} />
               <Text style={styles.sheetItemTitle}>Browse device files…</Text>
             </TouchableOpacity>
           </GHScrollView>
@@ -597,10 +607,10 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F7FBFE',
+    backgroundColor: colors.background.app,
   },
 
   // Scroll
@@ -616,9 +626,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#F1F8FD',
+    backgroundColor: colors.background.soft,
     borderWidth: 1,
-    borderColor: '#D2E4EF',
+    borderColor: colors.border.default,
     borderRadius: 14,
     padding: 11,
     paddingHorizontal: 14,
@@ -631,22 +641,22 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
-    color: '#3f4946',
+    color: colors.text.secondary,
     fontWeight: '600',
   },
   formTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   formBtnEmpty: {
-    borderColor: '#B8C9D4',
-    backgroundColor: '#F3F8FC',
+    borderColor: colors.border.input,
+    backgroundColor: colors.background.fieldSoft,
   },
   formTitleEmpty: {
     fontSize: 15,
     fontWeight: '400',
-    color: '#8EA8B8',
+    color: colors.text.muted,
     fontStyle: 'italic',
   },
   activeFormAction: {
@@ -668,10 +678,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   activeFormExportBtn: {
-    backgroundColor: '#2589C8',
+    backgroundColor: colors.action.primary,
   },
   activeFormDeleteBtn: {
-    backgroundColor: '#a1161f',
+    backgroundColor: colors.action.delete,
   },
 
   // Hero
@@ -694,7 +704,7 @@ const styles = StyleSheet.create({
     width: 128,
     height: 128,
     borderRadius: 64,
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    backgroundColor: colors.overlay.heroBubbleStrong,
   },
   heroBubble2: {
     position: 'absolute',
@@ -703,7 +713,7 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: colors.overlay.heroBubbleSoft,
   },
   heroSettingsBtn: {
     position: 'absolute',
@@ -714,9 +724,9 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: colors.overlay.heroButton,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: colors.overlay.heroButtonBorder,
   },
   heroSyncBtn: {
     position: 'absolute',
@@ -727,9 +737,9 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: colors.overlay.heroButton,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: colors.overlay.heroButtonBorder,
   },
   heroBrand: {
     alignItems: 'center',
@@ -740,13 +750,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: colors.overlay.heroLogo,
   },
   heroTitle: {
     fontSize: 28,
     lineHeight: 32,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.text.inverse,
   },
 
   // Section header
@@ -760,12 +770,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   viewAll: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2589C8',
+    color: colors.brand.primary,
   },
 
   // Empty
@@ -778,11 +788,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   emptyHint: {
     fontSize: 13,
-    color: '#3f4946',
+    color: colors.text.secondary,
     textAlign: 'center',
   },
 
@@ -799,7 +809,7 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     flex: 1,
-    backgroundColor: '#a1161f',
+    backgroundColor: colors.action.delete,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
@@ -808,7 +818,7 @@ const styles = StyleSheet.create({
   deleteLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.text.inverse,
     letterSpacing: 0.3,
   },
 
@@ -821,9 +831,9 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 26,
     paddingVertical: 18,
-    backgroundColor: '#2589C8',
+    backgroundColor: colors.action.primary,
     borderRadius: 20,
-    shadowColor: '#17689B',
+    shadowColor: colors.shadow.brand,
     shadowOpacity: 0.42,
     shadowRadius: 13,
     shadowOffset: { width: 0, height: 12 },
@@ -832,10 +842,10 @@ const styles = StyleSheet.create({
   fabText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text.inverse,
   },
   fabDisabled: {
-    backgroundColor: '#8EA8B8',
+    backgroundColor: colors.action.disabled,
     shadowOpacity: 0.12,
     elevation: 3,
   },
@@ -843,7 +853,7 @@ const styles = StyleSheet.create({
   // Scrim
   scrim: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.42)',
+    backgroundColor: colors.overlay.scrim,
     zIndex: 30,
   },
 
@@ -854,12 +864,12 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 31,
-    backgroundColor: '#F7FBFE',
+    backgroundColor: colors.background.app,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 10,
     maxHeight: '82%',
-    shadowColor: '#000',
+    shadowColor: colors.shadow.black,
     shadowOpacity: 0.18,
     shadowRadius: 15,
     shadowOffset: { width: 0, height: -8 },
@@ -869,7 +879,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#B8C9D4',
+    backgroundColor: colors.border.muted,
     alignSelf: 'center',
     marginBottom: 12,
   },
@@ -880,11 +890,11 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   sheetSub: {
     fontSize: 13,
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginTop: 2,
   },
   sheetItem: {
@@ -895,15 +905,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginHorizontal: 8,
     borderRadius: 14,
-    backgroundColor: '#F7FBFE',
+    backgroundColor: colors.background.app,
   },
   sheetItemActive: {
-    backgroundColor: '#EAF6FD',
+    backgroundColor: colors.background.elevatedGreen,
   },
   sheetDivider: {
     marginTop: 2,
     borderTopWidth: 1,
-    borderTopColor: '#E1EEF7',
+    borderTopColor: colors.border.section,
     borderRadius: 0,
     marginHorizontal: 0,
     paddingHorizontal: 22,
@@ -915,11 +925,11 @@ const styles = StyleSheet.create({
   sheetItemTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   sheetItemSub: {
     fontSize: 12,
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginTop: 1,
   },
 
@@ -935,7 +945,7 @@ const styles = StyleSheet.create({
   },
   downloadFormBtn: {
     flex: 1,
-    backgroundColor: '#2589C8',
+    backgroundColor: colors.action.primary,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
@@ -943,7 +953,7 @@ const styles = StyleSheet.create({
   },
   deleteFormBtn: {
     flex: 1,
-    backgroundColor: '#a1161f',
+    backgroundColor: colors.action.delete,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
@@ -952,7 +962,7 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.text.inverse,
     letterSpacing: 0.3,
   },
 
@@ -970,11 +980,11 @@ const styles = StyleSheet.create({
   emptyFormsTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   emptyFormsHint: {
     fontSize: 12.5,
-    color: '#3f4946',
+    color: colors.text.secondary,
     textAlign: 'center',
     paddingHorizontal: 24,
   },

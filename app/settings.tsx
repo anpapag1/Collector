@@ -1,11 +1,12 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
 import { useEntriesStore } from '../store/entriesStore';
-import { colors } from '../theme/colors';
+import { AppColors } from '../theme/colors';
+import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import ScreenBubbles from '../components/ScreenBubbles';
 import ThemeToggle from '../components/ThemeToggle';
 import { useThemeStore } from '../store/themeStore';
@@ -14,8 +15,8 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
-  const isDark = themeMode === 'dark';
-  const styles = useMemo(() => createStyles(isDark), [isDark]);
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const authUser = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
   const entries = useEntriesStore((s) => s.entries);
@@ -46,13 +47,13 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {!isDark && <ScreenBubbles />}
+      <ScreenBubbles />
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <MaterialIcons
             name="arrow-back"
             size={24}
-            color={isDark ? '#F7FBFE' : colors.text.primary}
+            color={colors.text.primary}
           />
         </TouchableOpacity>
         <Text style={styles.title}>Settings</Text>
@@ -73,7 +74,7 @@ export default function SettingsScreen() {
             <MaterialIcons
               name="logout"
               size={22}
-              color={isDark ? '#A4B7C1' : colors.text.secondary}
+              color={colors.text.secondary}
             />
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Sign out</Text>
@@ -85,7 +86,7 @@ export default function SettingsScreen() {
             <MaterialIcons
               name="login"
               size={22}
-              color={isDark ? '#A4B7C1' : colors.text.secondary}
+              color={colors.text.secondary}
             />
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Sign in</Text>
@@ -98,10 +99,10 @@ export default function SettingsScreen() {
   );
 }
 
-const createStyles = (isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: isDark ? '#050708' : colors.background.app,
+    backgroundColor: colors.background.app,
     overflow: 'hidden',
   },
   topBar: {
@@ -117,7 +118,7 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: isDark ? '#F7FBFE' : colors.text.primary,
+    color: colors.text.primary,
   },
   section: {
     marginTop: 12,
@@ -127,7 +128,7 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
-    color: isDark ? '#91A9B7' : colors.text.secondary,
+    color: colors.text.secondary,
     fontWeight: '600',
     marginBottom: 8,
     marginLeft: 6,
@@ -136,9 +137,9 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: isDark ? '#101B21' : colors.background.white,
+    backgroundColor: colors.background.white,
     borderWidth: 1,
-    borderColor: isDark ? '#203744' : colors.border.default,
+    borderColor: colors.border.default,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -150,18 +151,18 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
   rowTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: isDark ? '#F7FBFE' : colors.text.primary,
+    color: colors.text.primary,
   },
   rowSub: {
     fontSize: 12,
-    color: isDark ? '#A4B7C1' : colors.text.secondary,
+    color: colors.text.secondary,
     marginTop: 1,
   },
   appearanceCard: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: isDark ? '#203744' : colors.border.default,
-    backgroundColor: isDark ? '#101B21' : colors.background.white,
+    borderColor: colors.border.default,
+    backgroundColor: colors.background.white,
     paddingHorizontal: 10,
     paddingVertical: 14,
   },

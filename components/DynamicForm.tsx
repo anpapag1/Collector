@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useMemo, useRef } from 'react';
+import React, { Fragment, memo, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { FieldDef, FormSection, PhotoItem } from '../types';
 import { GpsStatus } from '../store/formStore';
@@ -11,6 +11,8 @@ import ImageField from './fields/ImageField';
 import GpsField from './fields/GpsField';
 import BooleanField from './fields/BooleanField';
 import DateField from './fields/DateField';
+import { AppColors } from '../theme/colors';
+import { useThemedStyles } from '../theme/useAppColors';
 
 type Props = {
   fields: FieldDef[];
@@ -33,6 +35,7 @@ function DynamicForm({
   gpsStatus = 'idle',
   onGpsCapture,
 }: Props) {
+  const styles = useThemedStyles(createStyles);
   const sectionById = useMemo(
     () => Object.fromEntries(sections.map((s) => [s.id, s])),
     [sections],
@@ -212,17 +215,17 @@ function renderField(
   }
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   sectionHeader: {
     marginTop: 4,
     marginBottom: -8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#D8ECFA',
+    borderTopColor: colors.border.formSection,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#2589C8',
+    color: colors.brand.primary,
   },
 });

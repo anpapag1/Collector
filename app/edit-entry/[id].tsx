@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -8,8 +8,12 @@ import { isFieldFilled, isFieldVisible } from '../../utils/formLogic';
 import DynamicForm from '../../components/DynamicForm';
 import Toast from '../../components/Toast';
 import { PhotoItem } from '../../types';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
 export default function EditEntryScreen() {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const entries = useEntriesStore((s) => s.entries);
@@ -54,7 +58,7 @@ export default function EditEntryScreen() {
   if (!entry) {
     return (
       <View style={[styles.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
-        <MaterialIcons name="inventory" size={40} color="#8EA8B8" />
+        <MaterialIcons name="inventory" size={40} color={colors.text.muted} />
         <Text style={styles.notFound}>Entry not found</Text>
       </View>
     );
@@ -65,7 +69,7 @@ export default function EditEntryScreen() {
       <View style={[styles.inner, { paddingTop: insets.top }]}>
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-            <MaterialIcons name="arrow-back" size={24} color="#171d1b" />
+            <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.screenTitle}>Edit entry</Text>
           <View style={styles.iconBtn} />
@@ -100,7 +104,7 @@ export default function EditEntryScreen() {
 
         <View style={[styles.saveBar, { paddingBottom: insets.bottom + 16 }]}>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-            <MaterialIcons name="check" size={22} color="#fff" />
+            <MaterialIcons name="check" size={22} color={colors.text.inverse} />
             <Text style={styles.saveBtnText}>Save changes</Text>
           </TouchableOpacity>
         </View>
@@ -112,6 +116,7 @@ export default function EditEntryScreen() {
 }
 
 function ReadOnlyField({ field, value }: { field: { id: string; type: string; label: string }; value: any }) {
+  const styles = useThemedStyles(createStyles);
   if (field.type === 'image') {
     const photos: PhotoItem[] = Array.isArray(value) ? value : [];
     if (photos.length === 0) return null;
@@ -147,8 +152,8 @@ function ReadOnlyField({ field, value }: { field: { id: string; type: string; la
   return null;
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F7FBFE' },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background.app },
   inner: { flex: 1 },
 
   topBar: {
@@ -168,11 +173,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
     textAlign: 'center',
   },
 
-  notFound: { fontSize: 15, color: '#3f4946', marginTop: 12 },
+  notFound: { fontSize: 15, color: colors.text.secondary, marginTop: 12 },
 
   scroll: { flex: 1 },
   scrollContent: {
@@ -187,16 +192,16 @@ const styles = StyleSheet.create({
   },
   readOnlyHint: {
     fontSize: 12,
-    color: '#8EA8B8',
+    color: colors.text.muted,
     fontStyle: 'italic',
   },
 
   fieldCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.white,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E3F0F8',
+    borderColor: colors.border.soft,
     gap: 8,
   },
   fieldLabel: {
@@ -204,11 +209,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    color: '#3f4946',
+    color: colors.text.secondary,
   },
   fieldValue: {
     fontSize: 15,
-    color: '#171d1b',
+    color: colors.text.primary,
     lineHeight: 22,
   },
 
@@ -222,7 +227,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#E1EEF7',
+    backgroundColor: colors.border.section,
   },
   photoImage: { width: '100%', height: '100%' },
 
@@ -240,8 +245,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
     borderRadius: 18,
-    backgroundColor: '#2589C8',
-    shadowColor: '#17689B',
+    backgroundColor: colors.action.primary,
+    shadowColor: colors.shadow.brand,
     shadowOpacity: 0.28,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
@@ -250,6 +255,6 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text.inverse,
   },
 });

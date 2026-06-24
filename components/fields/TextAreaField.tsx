@@ -1,6 +1,8 @@
-import { memo, useState } from 'react';
+import React, { memo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { FieldDef } from '../../types';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
 type Props = {
   field: FieldDef;
@@ -10,6 +12,8 @@ type Props = {
 };
 
 function TextAreaField({ field, value, onChange, error }: Props) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const [focused, setFocused] = useState(false);
 
   return (
@@ -27,7 +31,7 @@ function TextAreaField({ field, value, onChange, error }: Props) {
         value={value}
         onChangeText={onChange}
         placeholder={field.placeholder}
-        placeholderTextColor="#7a847f"
+        placeholderTextColor={colors.text.placeholder}
         multiline
         numberOfLines={3}
         textAlignVertical="top"
@@ -39,35 +43,35 @@ function TextAreaField({ field, value, onChange, error }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginBottom: 7,
   },
-  required: { color: '#ba1a1a' },
+  required: { color: colors.text.danger },
   input: {
     width: '100%',
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#B8C9D4',
-    backgroundColor: '#fff',
+    borderColor: colors.border.input,
+    backgroundColor: colors.background.white,
     fontSize: 15,
-    color: '#171d1b',
+    color: colors.text.primary,
     minHeight: 96,
   },
   inputFocused: {
-    borderColor: '#2589C8',
-    shadowColor: '#2589C8',
+    borderColor: colors.brand.primary,
+    shadowColor: colors.brand.primary,
     shadowOpacity: 0.25,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 0 },
     elevation: 2,
   },
-  inputError: { borderColor: '#ba1a1a' },
-  errorText: { fontSize: 12, color: '#ba1a1a', marginTop: 5 },
+  inputError: { borderColor: colors.text.danger },
+  errorText: { fontSize: 12, color: colors.text.danger, marginTop: 5 },
 });
 
 export default memo(TextAreaField);

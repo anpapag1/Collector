@@ -1,7 +1,9 @@
-import { memo } from 'react';
+import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef, PhotoItem } from '../../types';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
 type Props = {
   field: FieldDef;
@@ -11,6 +13,8 @@ type Props = {
 };
 
 function ImageField({ field, value, onChange, onAddPress }: Props) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const remove = (id: string) => onChange(value.filter((p) => p.id !== id));
 
   return (
@@ -21,12 +25,12 @@ function ImageField({ field, value, onChange, onAddPress }: Props) {
           <View key={photo.id} style={styles.tile}>
             <Image source={{ uri: photo.uri }} style={styles.image} resizeMode="cover" />
             <TouchableOpacity style={styles.removeBtn} onPress={() => remove(photo.id)}>
-              <MaterialIcons name="close" size={15} color="#fff" />
+              <MaterialIcons name="close" size={15} color={colors.text.inverse} />
             </TouchableOpacity>
           </View>
         ))}
         <TouchableOpacity style={styles.addTile} onPress={onAddPress}>
-          <MaterialIcons name="add-a-photo" size={24} color="#2589C8" />
+          <MaterialIcons name="add-a-photo" size={24} color={colors.brand.primary} />
           <Text style={styles.addText}>Add</Text>
         </TouchableOpacity>
       </View>
@@ -34,11 +38,11 @@ function ImageField({ field, value, onChange, onAddPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginBottom: 9,
   },
   grid: {
@@ -53,7 +57,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     borderWidth: 1,
-    borderColor: '#B8C9D4',
+    borderColor: colors.border.image,
   },
   image: {
     width: '100%',
@@ -66,7 +70,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: colors.overlay.imageScrim,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -76,8 +80,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: '#8EA8B8',
-    backgroundColor: '#F1F8FD',
+    borderColor: colors.border.disabled,
+    backgroundColor: colors.background.soft,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
@@ -85,7 +89,7 @@ const styles = StyleSheet.create({
   addText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2589C8',
+    color: colors.brand.primary,
   },
 });
 

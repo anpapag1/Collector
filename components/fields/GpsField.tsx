@@ -1,7 +1,9 @@
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { memo, useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GpsStatus } from '../../store/formStore';
+import { AppColors } from '../../theme/colors';
+import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
 type Props = {
   status: GpsStatus;
@@ -13,6 +15,8 @@ type Props = {
 };
 
 function GpsField({ status, coords, accuracy, address, onCapture, error }: Props) {
+  const colors = useAppColors();
+  const styles = useThemedStyles(createStyles);
   const spinAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -47,10 +51,10 @@ function GpsField({ status, coords, accuracy, address, onCapture, error }: Props
       {status === 'done' && (
         <View style={styles.row}>
           <View style={styles.doneCircle}>
-            <MaterialIcons name="location-on" size={22} color="#2589C8" />
+            <MaterialIcons name="location-on" size={22} color={colors.brand.primary} />
           </View>
           <View style={styles.textBlock}>
-            <Text style={[styles.title, { color: '#17689B' }]}>Location captured</Text>
+            <Text style={[styles.title, { color: colors.text.brandDark }]}>Location captured</Text>
             {address ? <Text style={styles.address}>{address}</Text> : null}
             <Text style={styles.sub}>{coords} · {accuracy}</Text>
           </View>
@@ -62,7 +66,7 @@ function GpsField({ status, coords, accuracy, address, onCapture, error }: Props
 
       {status === 'idle' && (
         <View style={styles.row}>
-          <MaterialIcons name="location-searching" size={24} color="#3f4946" />
+          <MaterialIcons name="location-searching" size={24} color={colors.text.secondary} />
           <View style={styles.textBlock}>
             <Text style={styles.title}>
               GPS location <Text style={styles.required}>*</Text>
@@ -82,16 +86,16 @@ function GpsField({ status, coords, accuracy, address, onCapture, error }: Props
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   banner: {
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#D2E4EF',
-    backgroundColor: '#F1F8FD',
+    borderColor: colors.border.default,
+    backgroundColor: colors.background.soft,
   },
   bannerError: {
-    borderColor: '#ba1a1a',
+    borderColor: colors.text.danger,
   },
   row: {
     flexDirection: 'row',
@@ -103,14 +107,14 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 3,
-    borderColor: '#B7DBF3',
-    borderTopColor: '#2589C8',
+    borderColor: colors.border.success,
+    borderTopColor: colors.brand.primary,
   },
   doneCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#EAF6FD',
+    backgroundColor: colors.background.elevatedGreen,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -121,21 +125,21 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#171d1b',
+    color: colors.text.primary,
   },
   sub: {
     fontSize: 12,
-    color: '#3f4946',
+    color: colors.text.secondary,
     marginTop: 1,
   },
   address: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#171d1b',
+    color: colors.text.primary,
     marginTop: 1,
   },
   required: {
-    color: '#ba1a1a',
+    color: colors.text.danger,
   },
   redoBtn: {
     padding: 6,
@@ -143,10 +147,10 @@ const styles = StyleSheet.create({
   redoBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2589C8',
+    color: colors.brand.primary,
   },
   captureBtn: {
-    backgroundColor: '#2589C8',
+    backgroundColor: colors.action.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 100,
@@ -154,11 +158,11 @@ const styles = StyleSheet.create({
   captureBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text.inverse,
   },
   errorText: {
     fontSize: 12,
-    color: '#ba1a1a',
+    color: colors.text.danger,
     marginTop: 8,
   },
 });
