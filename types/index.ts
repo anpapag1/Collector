@@ -77,6 +77,11 @@ export type Entry = {
   syncStatus: SyncStatus;
   syncingSince?: number | null;
   remoteId?: string | null;
+  // The remote row's `updated_at` as of the last successful push or pull —
+  // distinct from `updatedAt` (which bumps on every local change, synced or
+  // not). Lets the sync engine tell "I haven't seen this change yet" apart
+  // from "I made this change", which is what makes conflict detection work.
+  remoteUpdatedAt?: number | null;
   updatedAt: number;
   syncError?: string | null;
   syncAttempts?: number;

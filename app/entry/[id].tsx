@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   View,
   Text,
   ScrollView,
@@ -8,6 +7,7 @@ import {
   Image,
   StyleSheet,
 } from 'react-native';
+import { showDialog } from '../../store/dialogStore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,13 +63,13 @@ export default function EntryDetailScreen() {
   const displayNumber = displayNumbers.get(entry.id) ?? 0;
 
   const handleDelete = () => {
-    Alert.alert(
-      'Delete entry?',
-      `Entry #${String(displayNumber).padStart(2, '0')} will be permanently removed.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showDialog({
+      title: 'Delete entry?',
+      message: `Entry #${String(displayNumber).padStart(2, '0')} will be permanently removed.`,
+      actions: [
+        { label: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          label: 'Delete',
           style: 'destructive',
           onPress: () => {
             deleteEntry(entry.id);
@@ -77,7 +77,7 @@ export default function EntryDetailScreen() {
           },
         },
       ],
-    );
+    });
   };
 
   return (

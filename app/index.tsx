@@ -1,7 +1,6 @@
 import React from 'react';
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
-  Alert,
   Platform,
   View,
   Text,
@@ -10,6 +9,7 @@ import {
   StyleSheet,
   Animated,
 } from 'react-native';
+import { showDialog } from '../store/dialogStore';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -162,13 +162,13 @@ export default function HomeScreen() {
   const handleDeleteEntry = useCallback(
     (id: string) => {
       const num = displayNumbers.get(id) ?? 0;
-      Alert.alert(
-        'Delete entry?',
-        `Entry #${String(num).padStart(2, '0')} will be permanently removed.`,
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => entrySwipeRefs.current.get(id)?.close() },
+      showDialog({
+        title: 'Delete entry?',
+        message: `Entry #${String(num).padStart(2, '0')} will be permanently removed.`,
+        actions: [
+          { label: 'Cancel', style: 'cancel', onPress: () => entrySwipeRefs.current.get(id)?.close() },
           {
-            text: 'Delete',
+            label: 'Delete',
             style: 'destructive',
             onPress: () => {
               entrySwipeRefs.current.get(id)?.close();
@@ -176,8 +176,8 @@ export default function HomeScreen() {
               showSnack('Entry deleted');
             },
           },
-        ]
-      );
+        ],
+      });
     },
     [deleteEntry, showSnack, displayNumbers],
   );
@@ -216,13 +216,13 @@ export default function HomeScreen() {
     if (!preset) return;
     closeSwipe(presetId);
 
-    Alert.alert(
-      'Delete form?',
-      `${preset.config.formTitle} will be removed from this list.`,
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => closeSwipe(presetId) },
+    showDialog({
+      title: 'Delete form?',
+      message: `${preset.config.formTitle} will be removed from this list.`,
+      actions: [
+        { label: 'Cancel', style: 'cancel', onPress: () => closeSwipe(presetId) },
         {
-          text: 'Delete',
+          label: 'Delete',
           style: 'destructive',
           onPress: () => {
             if (preset.custom) {
@@ -252,7 +252,7 @@ export default function HomeScreen() {
           },
         },
       ],
-    );
+    });
   };
 
   const downloadPreset = async (preset: FormPreset) => {
@@ -319,13 +319,13 @@ export default function HomeScreen() {
       return;
     }
 
-    Alert.alert(
-      'Delete all entries?',
-      `This will permanently remove all ${total} ${total === 1 ? 'entry' : 'entries'}.`,
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => activeFormSwipeRef.current?.close() },
+    showDialog({
+      title: 'Delete all entries?',
+      message: `This will permanently remove all ${total} ${total === 1 ? 'entry' : 'entries'}.`,
+      actions: [
+        { label: 'Cancel', style: 'cancel', onPress: () => activeFormSwipeRef.current?.close() },
         {
-          text: 'Delete all',
+          label: 'Delete all',
           style: 'destructive',
           onPress: () => {
             clearEntries();
@@ -333,7 +333,7 @@ export default function HomeScreen() {
           },
         },
       ],
-    );
+    });
   };
 
   const renderActiveFormLeftActions = (progress: Animated.AnimatedInterpolation<number>) => {
@@ -482,7 +482,6 @@ export default function HomeScreen() {
                 <Text style={styles.formTitleEmpty}>No form loaded</Text>
               )}
             </View>
-            <MaterialIcons name="settings" size={20} color={schema ? colors.text.secondary : colors.text.muted} />
           </TouchableOpacity>
         </Swipeable>
 

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { showDialog } from '../store/dialogStore';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,13 +40,13 @@ export default function EntriesScreen() {
   const handleDelete = useCallback(
     (id: string) => {
       const num = displayNumbers.get(id) ?? 0;
-      Alert.alert(
-        'Delete entry?',
-        `Entry #${String(num).padStart(2, '0')} will be permanently removed.`,
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => swipeRefs.current.get(id)?.close() },
+      showDialog({
+        title: 'Delete entry?',
+        message: `Entry #${String(num).padStart(2, '0')} will be permanently removed.`,
+        actions: [
+          { label: 'Cancel', style: 'cancel', onPress: () => swipeRefs.current.get(id)?.close() },
           {
-            text: 'Delete',
+            label: 'Delete',
             style: 'destructive',
             onPress: () => {
               swipeRefs.current.get(id)?.close();
@@ -53,8 +54,8 @@ export default function EntriesScreen() {
               showSnack('Entry deleted');
             },
           },
-        ]
-      );
+        ],
+      });
     },
     [deleteEntry, showSnack, displayNumbers],
   );

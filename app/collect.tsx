@@ -18,6 +18,7 @@ import { File, Paths } from 'expo-file-system';
 import { useFormStore } from '../store/formStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { captureLocation } from '../utils/sensors';
+import { showDialog } from '../store/dialogStore';
 import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import { PhotoItem } from '../types';
@@ -35,7 +36,6 @@ export default function CollectScreen() {
   const addEntry = useEntriesStore((s) => s.addEntry);
 
   const [savedFlash, setSavedFlash] = useState(false);
-  const [exitWarn, setExitWarn] = useState(false);
   const [photoSheet, setPhotoSheet] = useState(false);
   const [activePhotoFieldId, setActivePhotoFieldId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
@@ -90,14 +90,25 @@ export default function CollectScreen() {
     return schema.fields.some((f) => isFieldFilled(f, draft[f.id]));
   }, [schema, draft]);
 
+  const confirmDiscard = useCallback(() => {
+    showDialog({
+      title: 'Discard entry?',
+      message: 'You have unsaved changes that will be lost.',
+      actions: [
+        { label: 'Keep editing', style: 'cancel' },
+        { label: 'Discard', style: 'destructive', onPress: () => { resetDraft(); router.back(); } },
+      ],
+    });
+  }, [resetDraft]);
+
   useEffect(() => {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (savedFlash) return true;
-      if (isDirty()) { setExitWarn(true); return true; }
+      if (isDirty()) { confirmDiscard(); return true; }
       return false;
     });
     return () => handler.remove();
-  }, [isDirty, savedFlash]);
+  }, [isDirty, savedFlash, confirmDiscard]);
 
   const requiredFields = useMemo(
     () => (schema?.fields.filter((f) => f.required) ?? []).filter((f) => isFieldVisible(f, draft)),
@@ -163,9 +174,9 @@ export default function CollectScreen() {
   }, [activePhotoFieldId, showSnack, draft, setField]);
 
   const handleBack = useCallback(() => {
-    if (isDirty()) setExitWarn(true);
+    if (isDirty()) confirmDiscard();
     else router.back();
-  }, [isDirty]);
+  }, [isDirty, confirmDiscard]);
 
   const handleFieldChange = useCallback((id: string, val: any) => setField(id, val), [setField]);
 
@@ -302,13 +313,6 @@ export default function CollectScreen() {
         icon="error-outline"
       />
 
-      <Toast
-        message={exitWarn ? 'Discard unsaved entry?' : null}
-        onDismiss={() => setExitWarn(false)}
-        bottom={96 + insets.bottom}
-        icon="delete-outline"
-        action={{ label: 'Discard', onPress: () => { setExitWarn(false); resetDraft(); router.back(); } }}
-      />
     </KeyboardAvoidingView>
   );
 }

@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import { Alert } from 'react-native';
+import { router } from 'expo-router';
 import type { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 import { usePickerStore } from './pickerStore';
+import { showDialog } from './dialogStore';
 
 // Deferred on purpose (see store/entriesStore.ts for the full explanation):
 // migrateLegacyEntries.ts and syncEngine.ts both import this module back, so
@@ -27,6 +28,8 @@ type AuthState = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   clearError: () => void;
 };
@@ -79,12 +82,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           parts.push(`${unclaimedForms.length} ${unclaimedForms.length === 1 ? 'form' : 'forms'}`);
         }
 
-        Alert.alert(
-          'Data on this device',
-          `You have ${parts.join(' and ')} collected before signing in. Upload them to your account, or discard them and just use what's already in your account?`,
-          [
+        showDialog({
+          title: 'Data on this device',
+          message: `You have ${parts.join(' and ')} collected before signing in. Upload them to your account, or discard them and just use what's already in your account?`,
+          actions: [
             {
-              text: 'Discard local',
+              label: 'Discard local',
               style: 'destructive',
               onPress: () => {
                 migrate.discardUnclaimedEntries();
@@ -92,14 +95,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
               },
             },
             {
-              text: 'Upload & sync',
+              label: 'Upload & sync',
               onPress: () => {
                 migrate.claimLegacyEntriesForUser(userId);
                 usePickerStore.getState().claimCustomFormsForUser(userId);
               },
             },
-          ]
-        );
+          ],
+        });
       }
     });
 
@@ -108,10 +111,19 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const parsed = new URL(url.replace('#', '?'));
       const access_token = parsed.searchParams.get('access_token');
       const refresh_token = parsed.searchParams.get('refresh_token');
+      const isRecovery = url.includes('reset-password-callback');
       if (access_token && refresh_token) {
-        supabase.auth.setSession({ access_token, refresh_token }).catch((e) => {
-          console.warn('[auth] setSession from deep link failed', e);
-        });
+        supabase.auth
+          .setSession({ access_token, refresh_token })
+          .then(() => {
+            // A password-reset email link signs the user into a temporary
+            // session — route them straight to "set a new password" instead
+            // of dropping them wherever they happened to be in the app.
+            if (isRecovery) router.replace('/(auth)/update-password');
+          })
+          .catch((e) => {
+            console.warn('[auth] setSession from deep link failed', e);
+          });
       }
     };
 
@@ -185,6 +197,24 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ loading: false, error: message });
       return { error: message };
     }
+  },
+
+  resetPassword: async (email) => {
+    set({ loading: true, error: null });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: Linking.createURL('reset-password-callback'),
+    });
+    const message = error?.message ?? null;
+    set({ loading: false, error: message });
+    return { error: message };
+  },
+
+  updatePassword: async (newPassword) => {
+    set({ loading: true, error: null });
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const message = error?.message ?? null;
+    set({ loading: false, error: message });
+    return { error: message };
   },
 
   signOut: async () => {

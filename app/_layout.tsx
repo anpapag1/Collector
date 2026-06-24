@@ -12,6 +12,7 @@ import {
 } from '@expo-google-fonts/roboto';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
+import * as Sentry from '@sentry/react-native';
 import { loadBundledConfig } from '../utils/schemaLoader';
 import { useFormStore } from '../store/formStore';
 import { usePickerStore } from '../store/pickerStore';
@@ -19,10 +20,20 @@ import { useEntriesStore } from '../store/entriesStore';
 import { useAuthStore } from '../store/authStore';
 import { useSyncStore } from '../store/syncStore';
 import { useThemeStore } from '../store/themeStore';
+import DialogHost from '../components/DialogHost';
+
+const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
+
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    tracesSampleRate: 1.0,
+  });
+}
 
 SplashScreen.preventAutoHideAsync().catch((e) => console.warn('preventAutoHideAsync failed', e));
 
-export default function RootLayout() {
+function RootLayout() {
   const hasInitialized = useFormStore((s) => s.hasInitialized);
   const loadSchema = useFormStore((s) => s.loadSchema);
   const setActivePresetId = usePickerStore((s) => s.setActivePresetId);
@@ -107,6 +118,7 @@ export default function RootLayout() {
             },
           }}
         />
+        <DialogHost />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -115,3 +127,8 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 });
+
+// Only wrap with Sentry's profiler when Sentry is actually initialized —
+// wrapping unconditionally logs a "Sentry.wrap called before Sentry.init"
+// warning on every boot while no DSN is configured.
+export default sentryDsn ? Sentry.wrap(RootLayout) : RootLayout;

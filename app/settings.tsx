@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { showDialog } from '../store/dialogStore';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -28,20 +29,20 @@ export default function SettingsScreen() {
   const clearLocalForms = usePickerStore((s) => s.clearLocalForms);
 
   const handleSeedTestEntries = () => {
-    Alert.alert(
-      'Add 100 test entries?',
-      'This adds 100 sample entries (each with a placeholder photo) for the Erwtimatologio Simiou form, useful for stress-testing the list, sync, and export. They behave exactly like real entries.',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showDialog({
+      title: 'Add 100 test entries?',
+      message: 'This adds 100 sample entries (each with a placeholder photo) for the Erwtimatologio Simiou form, useful for stress-testing the list, sync, and export. They behave exactly like real entries.',
+      actions: [
+        { label: 'Cancel', style: 'cancel' },
         {
-          text: 'Add entries',
+          label: 'Add entries',
           onPress: async () => {
             const count = await seedTestEntries();
-            Alert.alert('Done', `${count} test entries added.`);
+            showDialog({ title: 'Done', message: `${count} test entries added.`, actions: [{ label: 'OK' }] });
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleSignOut = () => {
@@ -58,13 +59,13 @@ export default function SettingsScreen() {
       parts.push(`${customForms.length} ${customForms.length === 1 ? 'form' : 'forms'}`);
     }
 
-    Alert.alert(
-      'Data on this device',
-      `You have ${parts.join(' and ')} stored locally. Keep them on this device for offline use, or delete them now? (Anything already synced stays safe in your account either way.)`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showDialog({
+      title: 'Data on this device',
+      message: `You have ${parts.join(' and ')} stored locally. Keep them on this device for offline use, or delete them now? (Anything already synced stays safe in your account either way.)`,
+      actions: [
+        { label: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete from device',
+          label: 'Delete from device',
           style: 'destructive',
           onPress: () => {
             clearLocalOnly();
@@ -72,9 +73,9 @@ export default function SettingsScreen() {
             signOut();
           },
         },
-        { text: 'Keep offline', onPress: () => signOut() },
-      ]
-    );
+        { label: 'Keep offline', onPress: () => signOut() },
+      ],
+    });
   };
 
   return (

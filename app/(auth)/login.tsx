@@ -161,6 +161,10 @@ export default function LoginScreen() {
             <Text style={styles.submitText}>{loading ? 'Signing in...' : 'Sign in'}</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.linkBtn} onPress={() => router.push('/(auth)/reset-password')}>
+            <Text style={styles.linkText}>Forgot password?</Text>
+          </TouchableOpacity>
+
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>or</Text>

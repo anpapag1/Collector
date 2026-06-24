@@ -28,6 +28,22 @@ function pushFormToSupabase(config: FormConfig, userId: string) {
     });
 }
 
+// Best-effort remote delete, mirroring entriesStore/deleteEntry's pattern.
+// Forms don't store a separate remoteId locally, so the (user_id, form_id,
+// version) unique key doubles as the match condition. RLS already scopes
+// deletes to auth.uid() = user_id, so this is safe even if userId were stale.
+function deleteFormFromSupabase(config: FormConfig, userId: string) {
+  supabase
+    .from('forms')
+    .delete()
+    .eq('user_id', userId)
+    .eq('form_id', config.formId)
+    .eq('version', config.version)
+    .then(({ error }) => {
+      if (error) console.warn('[sync] best-effort form remote delete failed', error);
+    });
+}
+
 type PickerState = {
   hiddenPresetIds: string[];
   customForms: CustomForm[];
@@ -75,12 +91,17 @@ export const usePickerStore = create<PickerState>()(
         if (!userId) return;
         pushFormToSupabase(config, userId);
       },
-      removeCustomForm: (importId) =>
+      removeCustomForm: (importId) => {
+        const removed = get().customForms.find((c) => c.importId === importId);
         set((state) => ({
           customForms: state.customForms.filter((c) => c.importId !== importId),
           activePresetId:
             state.activePresetId === importId ? null : state.activePresetId,
-        })),
+        }));
+        if (removed?.userId) {
+          deleteFormFromSupabase(removed.config, removed.userId);
+        }
+      },
       setActivePresetId: (id) => set({ activePresetId: id }),
       mergeRemoteForms: (forms) => {
         set((state) => {

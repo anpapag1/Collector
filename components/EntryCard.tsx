@@ -1,11 +1,12 @@
 import React, { memo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Entry, PhotoItem } from '../types';
 import { timeAgo } from '../utils/timeUtils';
 import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import { useAuthStore } from '../store/authStore';
+import { showDialog } from '../store/dialogStore';
 
 type Props = {
   entry: Entry;
@@ -93,9 +94,17 @@ function EntryCard({ entry, displayNumber, onOpen }: Props) {
   const syncMeta = signedIn && entry.syncStatus ? syncStatusMeta[entry.syncStatus] : null;
 
   const handleSyncBadgePress = () => {
-    if (entry.syncStatus === 'error' && entry.syncError) {
-      Alert.alert('Sync error', entry.syncError);
-    }
+    if (!entry.syncStatus) return;
+    const lines = [
+      `Status: ${entry.syncStatus}`,
+      entry.syncError ? `Last error: ${entry.syncError}` : null,
+      entry.syncAttempts ? `Attempts: ${entry.syncAttempts}` : null,
+      entry.remoteId ? `Remote id: ${entry.remoteId}` : 'Not yet uploaded',
+      entry.syncStatus === 'syncing' && entry.syncingSince
+        ? `Syncing since: ${new Date(entry.syncingSince).toLocaleTimeString()}`
+        : null,
+    ].filter(Boolean);
+    showDialog({ title: 'Sync status', message: lines.join('\n'), actions: [{ label: 'OK' }] });
   };
 
   return (
@@ -118,14 +127,11 @@ function EntryCard({ entry, displayNumber, onOpen }: Props) {
             <Text style={styles.formName} numberOfLines={1}>{formTitle}</Text>
           ) : null}
           <View style={styles.topRowRight}>
-            {syncMeta &&
-              (entry.syncStatus === 'error' ? (
-                <TouchableOpacity onPress={handleSyncBadgePress} hitSlop={8}>
-                  <MaterialIcons name={syncMeta.icon} size={14} color={syncMeta.color} />
-                </TouchableOpacity>
-              ) : (
+            {syncMeta && (
+              <TouchableOpacity onPress={handleSyncBadgePress} hitSlop={8}>
                 <MaterialIcons name={syncMeta.icon} size={14} color={syncMeta.color} />
-              ))}
+              </TouchableOpacity>
+            )}
             <Text style={styles.ago}>{timeAgo(createdAt)}</Text>
           </View>
         </View>

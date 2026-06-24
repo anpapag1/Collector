@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import { Entry, EntryData, FieldDef, PhotoItem } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -78,9 +79,10 @@ type EntriesState = {
   clearEntries: (options?: { deleteRemote?: boolean }) => void;
   clearLocalOnly: () => void;
   markSyncing: (id: string) => void;
-  markSynced: (id: string, remoteId: string) => void;
+  markSynced: (id: string, remoteId: string, remoteUpdatedAt: number) => void;
   markSyncError: (id: string, message: string) => void;
   mergeRemoteEntries: (remoteEntries: Entry[]) => void;
+  refreshEntryFromRemote: (id: string, fresh: Entry) => void;
 };
 
 export const useEntriesStore = create<EntriesState>()(
@@ -91,7 +93,7 @@ export const useEntriesStore = create<EntriesState>()(
         set((s) => {
           const now = Date.now();
           const entry: Entry = {
-            id: `entry-${s.entries.length + 1}-${now}`,
+            id: `entry-${Crypto.randomUUID()}`,
             createdAt: createdAt ?? now,
             formTitle,
             fields,
@@ -162,7 +164,7 @@ export const useEntriesStore = create<EntriesState>()(
           ),
         }));
       },
-      markSynced: (id, remoteId) => {
+      markSynced: (id, remoteId, remoteUpdatedAt) => {
         set((s) => ({
           entries: s.entries.map((e) =>
             e.id === id
@@ -171,6 +173,7 @@ export const useEntriesStore = create<EntriesState>()(
                   syncStatus: 'synced',
                   syncingSince: null,
                   remoteId,
+                  remoteUpdatedAt,
                   syncError: null,
                   updatedAt: Date.now(),
                 }
@@ -200,6 +203,28 @@ export const useEntriesStore = create<EntriesState>()(
           if (toAdd.length === 0) return s;
           return { entries: [...s.entries, ...toAdd] };
         });
+      },
+      // Overwrites a local entry's content with the latest remote version —
+      // used when another device edited this entry and pull detects the
+      // remote `updated_at` is newer than what this device last saw. Only
+      // called for entries with no in-flight local edit (see syncEngine.ts).
+      refreshEntryFromRemote: (id, fresh) => {
+        set((s) => ({
+          entries: s.entries.map((e) =>
+            e.id === id
+              ? {
+                  ...e,
+                  data: fresh.data,
+                  fields: fresh.fields,
+                  formTitle: fresh.formTitle,
+                  remoteUpdatedAt: fresh.remoteUpdatedAt,
+                  updatedAt: fresh.updatedAt,
+                  syncStatus: 'synced',
+                  syncError: null,
+                }
+              : e
+          ),
+        }));
       },
     }),
     {
