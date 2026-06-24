@@ -7,6 +7,7 @@ import { useEntriesStore } from '../store/entriesStore';
 import { usePickerStore } from '../store/pickerStore';
 import { Entry, EntryData, FormConfig, PhotoItem } from '../types';
 import { validateFormConfig } from '../utils/schemaLoader';
+import { debugLog } from '../utils/debugLog';
 
 const PHOTO_UPLOAD_TIMEOUT_MS = 30_000;
 const DB_QUERY_TIMEOUT_MS = 15_000;
@@ -20,7 +21,7 @@ let queuedRerun = false;
 // runSync() multiple times in parallel.
 export function requestSync() {
   if (isRunning) {
-    console.log('[sync] requestSync: already running, queuing a rerun');
+    debugLog('[sync] requestSync: already running, queuing a rerun');
     queuedRerun = true;
     return;
   }
@@ -47,7 +48,7 @@ async function runSync(): Promise<void> {
       Sentry.captureException(sessionError);
     }
     if (!session) {
-      console.log('[sync] runSync skipped: not signed in');
+      debugLog('[sync] runSync skipped: not signed in');
       return;
     }
     const userId = session.user.id;
@@ -63,15 +64,15 @@ async function runSync(): Promise<void> {
       }
       return false;
     });
-    console.log(`[sync] runSync: ${due.length} entr${due.length === 1 ? 'y' : 'ies'} due out of ${entries.length} total`);
+    debugLog(`[sync] runSync: ${due.length} entr${due.length === 1 ? 'y' : 'ies'} due out of ${entries.length} total`);
 
     for (const entry of due) {
       markSyncing(entry.id);
-      console.log(`[sync] pushing entry ${entry.id} (status was ${entry.syncStatus})`);
+      debugLog(`[sync] pushing entry ${entry.id} (status was ${entry.syncStatus})`);
       try {
         const { remoteId, remoteUpdatedAt } = await syncOneEntry(entry, userId);
         markSynced(entry.id, remoteId, remoteUpdatedAt);
-        console.log(`[sync] entry ${entry.id} synced ok -> remoteId ${remoteId}`);
+        debugLog(`[sync] entry ${entry.id} synced ok -> remoteId ${remoteId}`);
       } catch (err) {
         const message = errorMessage(err);
         console.warn(`[sync] entry ${entry.id} failed:`, message, err);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
 import { showDialog } from '../store/dialogStore';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import Constants from 'expo-constants';
 import { useAuthStore } from '../store/authStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { usePickerStore } from '../store/pickerStore';
+import { useDevModeStore } from '../store/devModeStore';
 import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import ScreenBubbles from '../components/ScreenBubbles';
@@ -27,6 +28,8 @@ export default function SettingsScreen() {
   const clearLocalOnly = useEntriesStore((s) => s.clearLocalOnly);
   const customForms = usePickerStore((s) => s.customForms);
   const clearLocalForms = usePickerStore((s) => s.clearLocalForms);
+  const devModeEnabled = useDevModeStore((s) => s.enabled);
+  const setDevModeEnabled = useDevModeStore((s) => s.setEnabled);
 
   const handleSeedTestEntries = () => {
     showDialog({
@@ -142,13 +145,29 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Developer</Text>
-        <TouchableOpacity style={styles.row} onPress={handleSeedTestEntries}>
-          <MaterialIcons name="science" size={22} color={colors.text.secondary} />
+        <View style={[styles.row, devModeEnabled && styles.rowGroupTop]}>
+          <MaterialIcons name="developer-mode" size={22} color={colors.text.secondary} />
           <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>Add 100 test entries</Text>
-            <Text style={styles.rowSub}>Stress-test data for Erwtimatologio Simiou</Text>
+            <Text style={styles.rowTitle}>Developer mode</Text>
+            <Text style={styles.rowSub}>Enables debug logging and developer tools</Text>
           </View>
-        </TouchableOpacity>
+          <Switch
+            value={devModeEnabled}
+            onValueChange={setDevModeEnabled}
+            trackColor={{ false: colors.border.default, true: colors.brand.primary }}
+            thumbColor={colors.background.white}
+          />
+        </View>
+
+        {devModeEnabled && (
+          <TouchableOpacity style={[styles.row, styles.rowGroupBottom]} onPress={handleSeedTestEntries}>
+            <MaterialIcons name="science" size={22} color={colors.text.secondary} />
+            <View style={styles.rowBody}>
+              <Text style={styles.rowTitle}>Add 100 test entries</Text>
+              <Text style={styles.rowSub}>Stress-test data for Erwtimatologio Simiou</Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -198,6 +217,16 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 14,
+  },
+  rowGroupTop: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomWidth: 0,
+  },
+  rowGroupBottom: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: -1,
   },
   rowBody: {
     flex: 1,
