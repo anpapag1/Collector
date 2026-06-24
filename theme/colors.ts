@@ -108,7 +108,7 @@ export const darkColors: AppColors = {
     primary: '#43B4F2',
     primaryMid: '#2F9FDB',
     primaryLight: '#78C9F4',
-    primaryDark: '#1D789F',
+    primaryDark: '#0e7aa8',
     primarySoft: '#102E3D',
     oldPrimary: '#43B4F2',
     oldPrimaryStrong: '#2F9FDB',

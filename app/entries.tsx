@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,20 +34,35 @@ export default function EntriesScreen() {
     snackTimer.current = setTimeout(() => setSnackbar(null), SNACKBAR_TIMEOUT_MS);
   }, []);
 
+  const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
+
   const handleDelete = useCallback(
     (id: string) => {
-      swipeRefs.current.get(id)?.close();
-      deleteEntry(id);
-      showSnack('Entry deleted');
+      const num = displayNumbers.get(id) ?? 0;
+      Alert.alert(
+        'Delete entry?',
+        `Entry #${String(num).padStart(2, '0')} will be permanently removed.`,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => swipeRefs.current.get(id)?.close() },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              swipeRefs.current.get(id)?.close();
+              deleteEntry(id);
+              showSnack('Entry deleted');
+            },
+          },
+        ]
+      );
     },
-    [deleteEntry, showSnack],
+    [deleteEntry, showSnack, displayNumbers],
   );
 
   const sorted = useMemo(
     () => [...entries].sort((a, b) => b.createdAt - a.createdAt),
     [entries],
   );
-  const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
 
   const renderRightActions = (id: string, progress: Animated.AnimatedInterpolation<number>) => {
     const translateX = progress.interpolate({

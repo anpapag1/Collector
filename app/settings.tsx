@@ -3,8 +3,10 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useAuthStore } from '../store/authStore';
 import { useEntriesStore } from '../store/entriesStore';
+import { usePickerStore } from '../store/pickerStore';
 import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import ScreenBubbles from '../components/ScreenBubbles';
@@ -22,6 +24,8 @@ export default function SettingsScreen() {
   const signOut = useAuthStore((s) => s.signOut);
   const entries = useEntriesStore((s) => s.entries);
   const clearLocalOnly = useEntriesStore((s) => s.clearLocalOnly);
+  const customForms = usePickerStore((s) => s.customForms);
+  const clearLocalForms = usePickerStore((s) => s.clearLocalForms);
 
   const handleSeedTestEntries = () => {
     Alert.alert(
@@ -41,13 +45,22 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = () => {
-    if (entries.length === 0) {
+    if (entries.length === 0 && customForms.length === 0) {
       signOut();
       return;
     }
+
+    const parts: string[] = [];
+    if (entries.length > 0) {
+      parts.push(`${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`);
+    }
+    if (customForms.length > 0) {
+      parts.push(`${customForms.length} ${customForms.length === 1 ? 'form' : 'forms'}`);
+    }
+
     Alert.alert(
-      'Entries on this device',
-      `You have ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} stored locally. Keep them on this device for offline use, or delete them now? (Anything already synced stays safe in your account either way.)`,
+      'Data on this device',
+      `You have ${parts.join(' and ')} stored locally. Keep them on this device for offline use, or delete them now? (Anything already synced stays safe in your account either way.)`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -55,6 +68,7 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: () => {
             clearLocalOnly();
+            clearLocalForms();
             signOut();
           },
         },
@@ -112,6 +126,17 @@ export default function SettingsScreen() {
             </View>
           </TouchableOpacity>
         )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>About</Text>
+        <View style={styles.row}>
+          <MaterialIcons name="info-outline" size={22} color={colors.text.secondary} />
+          <View style={styles.rowBody}>
+            <Text style={styles.rowTitle}>{Constants.expoConfig?.name ?? 'Collector'}</Text>
+            <Text style={styles.rowSub}>Version {Constants.expoConfig?.version ?? '—'}</Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.section}>

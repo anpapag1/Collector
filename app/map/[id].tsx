@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,14 @@ export default function MapScreen() {
   const entries = useEntriesStore((s) => s.entries);
   const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
   const [selected, setSelected] = useState<MapPoint | null>(null);
+  const [showsUserLocation, setShowsUserLocation] = useState(false);
+  const mapRef = useRef<MapView>(null);
+
+  useEffect(() => {
+    Location.requestForegroundPermissionsAsync()
+      .then(({ status }) => setShowsUserLocation(status === 'granted'))
+      .catch(() => setShowsUserLocation(false));
+  }, []);
 
   const mapPoints = useMemo(
     () =>
@@ -63,15 +72,19 @@ export default function MapScreen() {
       </View>
 
       <MapView
+        ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={initialRegion}
         mapType="standard"
         userInterfaceStyle={themeMode}
+        showsUserLocation={showsUserLocation}
+        showsMyLocationButton={showsUserLocation}
         loadingEnabled
         loadingBackgroundColor={colors.background.app}
         loadingIndicatorColor={colors.brand.primary}
         onPress={() => setSelected(null)}
+        onMapReady={() => mapRef.current?.animateToRegion(initialRegion, 0)}
       >
         {mapPoints.map((point) => (
           <Marker

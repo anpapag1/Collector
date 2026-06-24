@@ -4,6 +4,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
+import { usePickerStore } from './pickerStore';
 
 // Deferred on purpose (see store/entriesStore.ts for the full explanation):
 // migrateLegacyEntries.ts and syncEngine.ts both import this module back, so
@@ -61,18 +62,42 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ session, user: session?.user ?? null });
       if (event === 'SIGNED_IN' && session) {
         const migrate = getMigrateLegacyEntries();
-        const unclaimed = migrate.getUnclaimedEntries();
-        if (unclaimed.length === 0) {
+        const unclaimedEntries = migrate.getUnclaimedEntries();
+        const unclaimedForms = usePickerStore.getState().customForms.filter((f) => !f.userId);
+        const userId = session.user.id;
+
+        if (unclaimedEntries.length === 0 && unclaimedForms.length === 0) {
           requestSync();
           return;
         }
-        const userId = session.user.id;
+
+        const parts: string[] = [];
+        if (unclaimedEntries.length > 0) {
+          parts.push(`${unclaimedEntries.length} ${unclaimedEntries.length === 1 ? 'entry' : 'entries'}`);
+        }
+        if (unclaimedForms.length > 0) {
+          parts.push(`${unclaimedForms.length} ${unclaimedForms.length === 1 ? 'form' : 'forms'}`);
+        }
+
         Alert.alert(
-          'Entries on this device',
-          `You have ${unclaimed.length} ${unclaimed.length === 1 ? 'entry' : 'entries'} collected before signing in. Upload them to your account, or discard them and just use what's already in your account?`,
+          'Data on this device',
+          `You have ${parts.join(' and ')} collected before signing in. Upload them to your account, or discard them and just use what's already in your account?`,
           [
-            { text: 'Discard local', style: 'destructive', onPress: () => migrate.discardUnclaimedEntries() },
-            { text: 'Upload & sync', onPress: () => migrate.claimLegacyEntriesForUser(userId) },
+            {
+              text: 'Discard local',
+              style: 'destructive',
+              onPress: () => {
+                migrate.discardUnclaimedEntries();
+                usePickerStore.getState().discardUnclaimedCustomForms();
+              },
+            },
+            {
+              text: 'Upload & sync',
+              onPress: () => {
+                migrate.claimLegacyEntriesForUser(userId);
+                usePickerStore.getState().claimCustomFormsForUser(userId);
+              },
+            },
           ]
         );
       }

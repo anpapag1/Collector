@@ -161,11 +161,25 @@ export default function HomeScreen() {
 
   const handleDeleteEntry = useCallback(
     (id: string) => {
-      entrySwipeRefs.current.get(id)?.close();
-      deleteEntry(id);
-      showSnack('Entry deleted');
+      const num = displayNumbers.get(id) ?? 0;
+      Alert.alert(
+        'Delete entry?',
+        `Entry #${String(num).padStart(2, '0')} will be permanently removed.`,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => entrySwipeRefs.current.get(id)?.close() },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              entrySwipeRefs.current.get(id)?.close();
+              deleteEntry(id);
+              showSnack('Entry deleted');
+            },
+          },
+        ]
+      );
     },
-    [deleteEntry, showSnack],
+    [deleteEntry, showSnack, displayNumbers],
   );
 
   const renderEntryRightActions = (
