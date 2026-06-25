@@ -12,6 +12,7 @@ import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEntriesStore } from '../store/entriesStore';
 import { useFormStore } from '../store/formStore';
+import { useAuthStore } from '../store/authStore';
 import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import {
@@ -30,11 +31,23 @@ export default function ExportScreen() {
   const insets = useSafeAreaInsets();
   const allEntries = useEntriesStore((s) => s.entries);
   const schema = useFormStore((s) => s.schema);
+  const session = useAuthStore((s) => s.session);
+  const currentUserId = session?.user?.id ?? null;
+  // Never export another already-claimed account's entries that happen to
+  // still be cached on this device — only the signed-in account's own
+  // entries plus any not-yet-claimed (userId == null) local entries.
+  const ownedEntries = useMemo(
+    () =>
+      allEntries.filter((e) =>
+        currentUserId ? e.userId === currentUserId || e.userId == null : e.userId == null,
+      ),
+    [allEntries, currentUserId],
+  );
   // Export only the active form's entries — other forms' data shouldn't
   // leak into this form's export file.
   const entries = useMemo(
-    () => (schema ? allEntries.filter((e) => e.formTitle === schema.formTitle) : []),
-    [allEntries, schema],
+    () => (schema ? ownedEntries.filter((e) => e.formTitle === schema.formTitle) : []),
+    [ownedEntries, schema],
   );
 
   const [phase, setPhase] = useState<Phase>('summary');
@@ -45,16 +58,20 @@ export default function ExportScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
 
-  const photoTotal = entries.reduce((sum, e) => {
-    // Entries with their own `fields` snapshot use it directly (a form can
-    // have more than one image-type field); legacy entries (no snapshot)
-    // fall back to the hardcoded 'photo' key, matching EntryCard.tsx's
-    // legacy fallback, rather than guessing using the *current* active
-    // schema's image field id (which may not match the schema the entry was
-    // actually collected under).
-    const fieldIds = e.fields ? e.fields.filter((f) => f.type === 'image').map((f) => f.id) : ['photo'];
-    return sum + fieldIds.reduce((s, fieldId) => s + ((e.data[fieldId] ?? []) as any[]).length, 0);
-  }, 0);
+  const photoTotal = useMemo(
+    () =>
+      entries.reduce((sum, e) => {
+        // Entries with their own `fields` snapshot use it directly (a form can
+        // have more than one image-type field); legacy entries (no snapshot)
+        // fall back to the hardcoded 'photo' key, matching EntryCard.tsx's
+        // legacy fallback, rather than guessing using the *current* active
+        // schema's image field id (which may not match the schema the entry was
+        // actually collected under).
+        const fieldIds = e.fields ? e.fields.filter((f) => f.type === 'image').map((f) => f.id) : ['photo'];
+        return sum + fieldIds.reduce((s, fieldId) => s + ((e.data[fieldId] ?? []) as any[]).length, 0);
+      }, 0),
+    [entries],
+  );
   const zipFilename = schema ? exportFilename(schema.formId) : 'export.zip';
   const csvFilename = schema ? csvExportFilename(schema.formId) : 'export.csv';
   const activeFilename = exportKind === 'csv' ? csvFilename : zipFilename;

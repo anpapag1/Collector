@@ -3,7 +3,7 @@ import { decode } from 'base64-arraybuffer';
 import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
-import { useEntriesStore } from '../store/entriesStore';
+import { useEntriesStore, processPendingDeletions } from '../store/entriesStore';
 import { usePickerStore } from '../store/pickerStore';
 import { Entry, EntryData, FormConfig, PhotoItem } from '../types';
 import { validateFormConfig } from '../utils/schemaLoader';
@@ -15,6 +15,13 @@ const STALE_SYNCING_MS = 2 * 60_000;
 
 let isRunning = false;
 let queuedRerun = false;
+
+// Tracks entry ids with a syncOneEntry call genuinely in flight right now —
+// guards against two concurrent syncOneEntry calls for the same entry (e.g.
+// the stale-syncing recovery picking up an entry whose original attempt is
+// merely slow, not actually dead, or runSync somehow re-entering despite the
+// isRunning guard), which would otherwise race markSyncing/markSynced/markSyncError.
+const inFlightEntryIds = new Set<string>();
 
 // Single entry point every trigger (addEntry, sign-in, foreground, connectivity,
 // interval) calls. Coalesces concurrent calls into one pass instead of running
@@ -67,6 +74,11 @@ async function runSync(): Promise<void> {
     debugLog(`[sync] runSync: ${due.length} entr${due.length === 1 ? 'y' : 'ies'} due out of ${entries.length} total`);
 
     for (const entry of due) {
+      if (inFlightEntryIds.has(entry.id)) {
+        debugLog(`[sync] entry ${entry.id} already has a sync in flight, skipping`);
+        continue;
+      }
+      inFlightEntryIds.add(entry.id);
       markSyncing(entry.id);
       debugLog(`[sync] pushing entry ${entry.id} (status was ${entry.syncStatus})`);
       try {
@@ -78,7 +90,19 @@ async function runSync(): Promise<void> {
         console.warn(`[sync] entry ${entry.id} failed:`, message, err);
         Sentry.captureException(err);
         markSyncError(entry.id, message);
+      } finally {
+        inFlightEntryIds.delete(entry.id);
       }
+    }
+
+    // Retry any remote deletes that didn't complete on a previous pass
+    // before pulling — otherwise pullRemoteEntries could re-download a row
+    // whose delete is merely pending retry, "resurrecting" it locally.
+    try {
+      await processPendingDeletions();
+    } catch (err) {
+      console.warn('[sync] pending deletions retry failed', err);
+      Sentry.captureException(err);
     }
 
     // Each pull is independent — one failing (e.g. a single photo download
@@ -123,7 +147,10 @@ async function syncOneEntry(
       `Checking entry ${entry.id} for conflicts timed out`
     );
     if (checkError) {
-      console.warn(`[sync] conflict pre-check failed for ${entry.id}, proceeding without it`, checkError);
+      // Do NOT proceed without the conflict check — that would upload over
+      // a possibly-newer remote version with zero protection. Throw so this
+      // entry is left in 'error' (via markSyncError) and retried next pass.
+      throw checkError;
     } else if (current) {
       const liveRemoteUpdatedAt = new Date(current.updated_at).getTime();
       if (entry.remoteUpdatedAt < liveRemoteUpdatedAt) {
@@ -215,8 +242,12 @@ async function uploadOnePhoto(
 // are deliberately left alone here — see syncOneEntry's conflict check for
 // why overwriting them on pull would silently destroy the user's own edit.
 async function pullRemoteEntries(userId: string): Promise<void> {
-  const { entries } = useEntriesStore.getState();
+  const { entries, pendingDeletions } = useEntriesStore.getState();
   const localById = new Map(entries.map((e) => [e.id, e]));
+  // Defense in depth: processPendingDeletions already runs before this in
+  // runSync, but skip any row whose delete is still pending retry anyway —
+  // downloading it back would "resurrect" an entry the user deleted.
+  const pendingDeletionIds = new Set(pendingDeletions.map((p) => p.remoteId));
 
   const { data: rows, error } = await withTimeout(
     supabase
@@ -235,6 +266,7 @@ async function pullRemoteEntries(userId: string): Promise<void> {
   const missing: typeof rows = [];
   const stale: typeof rows = [];
   for (const row of rows ?? []) {
+    if (pendingDeletionIds.has(row.id)) continue;
     const local = localById.get(row.local_id);
     if (!local) {
       missing.push(row);
@@ -291,17 +323,42 @@ async function downloadRemoteEntry(
   const localData: EntryData = { ...row.data };
   const imageFields = (row.fields ?? []).filter((f) => f.type === 'image');
 
+  let hadPartialFailure = false;
   for (const field of imageFields) {
     const remotePhotos: { id: string; path: string }[] = row.data[field.id] ?? [];
     if (!Array.isArray(remotePhotos) || remotePhotos.length === 0) continue;
 
-    const localPhotos = await Promise.all(
-      remotePhotos.map((p) => downloadOnePhoto(p))
-    );
+    // allSettled (not all): one flaky photo must not discard the others that
+    // did download successfully — a Promise.all reject here would throw away
+    // every already-downloaded photo for this entry, forcing a full re-download
+    // of the whole field (and every other image field) on the next retry.
+    const results = await Promise.allSettled(remotePhotos.map((p) => downloadOnePhoto(p)));
+    const localPhotos: PhotoItem[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'fulfilled') {
+        localPhotos.push(result.value);
+      } else {
+        hadPartialFailure = true;
+        console.warn(`[sync] failed to download photo ${remotePhotos[i]?.id} for entry ${row.local_id}, will retry next pass`, result.reason);
+      }
+    }
     localData[field.id] = localPhotos;
   }
 
-  const remoteUpdatedAt = new Date(row.updated_at).getTime();
+  const serverRemoteUpdatedAt = new Date(row.updated_at).getTime();
+  // On a partial photo failure, record a remoteUpdatedAt one tick behind the
+  // server's actual value instead of the real one. pullRemoteEntries' staleness
+  // check (`local.remoteUpdatedAt < remoteUpdatedAt`) compares against this
+  // field, so storing the true value here would make the entry look fully
+  // up to date forever — even though it's missing photos — and no future pass
+  // would ever retry the download. Storing it one tick behind keeps the entry
+  // "stale" so the next pull re-attempts the still-missing photos.
+  const remoteUpdatedAt = hadPartialFailure ? serverRemoteUpdatedAt - 1 : serverRemoteUpdatedAt;
+  if (hadPartialFailure) {
+    console.warn(`[sync] entry ${row.local_id} downloaded with one or more missing photos; will retry on the next sync pass`);
+  }
+
   return {
     id: row.local_id,
     createdAt: new Date(row.created_at).getTime(),
@@ -361,24 +418,49 @@ async function pullRemoteForms(userId: string): Promise<void> {
   // If a local form isn't on the server, it was either added offline and push failed,
   // or it was synced and then deleted on another device.
   // Locally-added forms have an importId starting with 'custom-'.
-  for (const c of extraLocal) {
-    if (c.importId.startsWith('custom-')) {
-      supabase
-        .from('forms')
-        .upsert({
-          user_id: userId,
-          form_id: c.config.formId,
-          form_title: c.config.formTitle,
-          version: c.config.version,
-          schema: c.config,
-        }, { onConflict: 'user_id,form_id,version' })
-        .then(({ error }) => {
-          if (error) console.warn('[sync] form offline-add push failed', error);
-        });
+  // These re-push attempts are awaited (not fire-and-forget) below, BEFORE
+  // removeRemoteDeletedForms runs — otherwise removeRemoteDeletedForms would
+  // see the stale (pre-push) serverKeys and treat every one of these
+  // just-re-pushed, locally-added forms as "deleted on another device",
+  // deleting them (and cascading into deleting all of that form's entries).
+  const pushResults = await Promise.allSettled(
+    extraLocal
+      .filter((c) => c.importId.startsWith('custom-'))
+      .map((c) =>
+        supabase
+          .from('forms')
+          .upsert({
+            user_id: userId,
+            form_id: c.config.formId,
+            form_title: c.config.formTitle,
+            version: c.config.version,
+            schema: c.config,
+          }, { onConflict: 'user_id,form_id,version' })
+          .then(({ error }) => {
+            if (error) throw error;
+            return c;
+          })
+      )
+  );
+
+  for (const result of pushResults) {
+    if (result.status === 'rejected') {
+      console.warn('[sync] form offline-add push failed', result.reason);
     }
   }
 
-  usePickerStore.getState().removeRemoteDeletedForms(serverKeys, userId);
+  // Forms this device just (re-)pushed (or any other extraLocal,
+  // locally-added-pending-push form) must never be treated as deletion
+  // candidates, regardless of whether the push succeeded — a failed push
+  // will simply be retried next pass, but it must not be deleted out from
+  // under the user in the meantime. Add their keys to the "safe" set passed
+  // to removeRemoteDeletedForms.
+  const safeKeys = new Set(serverKeys);
+  for (const c of extraLocal) {
+    safeKeys.add(`${c.config.formId}@${c.config.version}`);
+  }
+
+  usePickerStore.getState().removeRemoteDeletedForms(safeKeys, userId);
 
   if (missing.length === 0) return;
 

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable, FlatList } from 'react-native-gesture-handler';
 import { useEntriesStore } from '../store/entriesStore';
 import { useFormStore } from '../store/formStore';
+import { useAuthStore } from '../store/authStore';
 import EntryCard from '../components/EntryCard';
 import Toast from '../components/Toast';
 import type { Entry } from '../types';
@@ -26,11 +27,23 @@ export default function EntriesScreen() {
   const allEntries = useEntriesStore((s) => s.entries);
   const deleteEntry = useEntriesStore((s) => s.deleteEntry);
   const schema = useFormStore((s) => s.schema);
+  const session = useAuthStore((s) => s.session);
+  const currentUserId = session?.user?.id ?? null;
+  // Only show entries claimed by the currently signed-in account, plus
+  // not-yet-claimed (userId == null) local entries — never another
+  // already-claimed account's data left over on this device.
+  const ownedEntries = useMemo(
+    () =>
+      allEntries.filter((e) =>
+        currentUserId ? e.userId === currentUserId || e.userId == null : e.userId == null,
+      ),
+    [allEntries, currentUserId],
+  );
   // Only entries collected under the currently active form belong here —
   // other forms' entries must not show up in this list.
   const entries = useMemo(
-    () => (schema ? allEntries.filter((e) => e.formTitle === schema.formTitle) : []),
-    [allEntries, schema],
+    () => (schema ? ownedEntries.filter((e) => e.formTitle === schema.formTitle) : []),
+    [ownedEntries, schema],
   );
 
   const [snackbar, setSnackbar] = useState<string | null>(null);

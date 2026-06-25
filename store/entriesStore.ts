@@ -32,6 +32,78 @@ function photoStoragePaths(entry: Entry): string[] {
   return paths;
 }
 
+// A failed/unawaited remote delete used to just orphan the remote row —
+// pullRemoteEntries would then see "remote row with no local match" and
+// re-download it, "resurrecting" something the user deleted. Tracking
+// pending deletions (persisted, so it survives app restarts) lets syncEngine
+// retry the Supabase delete on every subsequent pass until it actually
+// succeeds, and lets pullRemoteEntries skip rows that are still pending
+// deletion instead of racing the retry.
+export type PendingDeletion = { remoteId: string; photoPaths: string[] };
+
+// Generic timeout wrapper, mirroring services/syncEngine.ts's withTimeout —
+// duplicated locally (rather than imported) to avoid entriesStore depending
+// on syncEngine, which itself depends on entriesStore (see the requestSync
+// comment above) and would create a require cycle.
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    );
+  });
+}
+
+const REMOTE_DELETE_TIMEOUT_MS = 15_000;
+
+// Best-effort-but-retried: attempts the remote entry row delete + photo
+// storage cleanup for a single pending deletion, removing it from
+// `pendingDeletions` only once both succeed (so a partial failure is
+// retried as a whole next pass rather than leaking the row or the photos).
+async function attemptPendingDeletion(pending: PendingDeletion): Promise<void> {
+  const { error } = await withTimeout(
+    supabase.from('entries').delete().eq('id', pending.remoteId),
+    REMOTE_DELETE_TIMEOUT_MS,
+    `Deleting entry ${pending.remoteId} timed out`
+  );
+  if (error) throw error;
+
+  if (pending.photoPaths.length > 0) {
+    const { error: storageError } = await withTimeout(
+      supabase.storage.from('entry-photos').remove(pending.photoPaths),
+      REMOTE_DELETE_TIMEOUT_MS,
+      `Deleting photos for entry ${pending.remoteId} timed out`
+    );
+    if (storageError) throw storageError;
+  }
+}
+
+// Called from syncEngine.ts's runSync before pullRemoteEntries, so a pending
+// deletion is always retried (or still pending) before the next pull could
+// otherwise re-download the same remote row.
+export async function processPendingDeletions(): Promise<void> {
+  const { pendingDeletions } = useEntriesStore.getState();
+  if (pendingDeletions.length === 0) return;
+
+  for (const pending of pendingDeletions) {
+    try {
+      await attemptPendingDeletion(pending);
+      useEntriesStore.setState((s) => ({
+        pendingDeletions: s.pendingDeletions.filter((p) => p.remoteId !== pending.remoteId),
+      }));
+    } catch (err) {
+      console.warn(`[sync] retrying pending deletion for ${pending.remoteId} failed, will retry next pass`, err);
+    }
+  }
+}
+
 // Allows a UI layer (e.g. app/_layout.tsx) to register a callback that gets
 // notified when a persistence write/read/remove fails, so failures can be
 // surfaced to the user (e.g. via a toast) instead of only logged.
@@ -73,6 +145,7 @@ export const safeAsyncStorage: StateStorage = {
 
 type EntriesState = {
   entries: Entry[];
+  pendingDeletions: PendingDeletion[];
   addEntry: (data: EntryData, fields: FieldDef[], formTitle: string, createdAt?: number) => void;
   updateEntry: (id: string, data: EntryData) => void;
   deleteEntry: (id: string) => void;
@@ -89,6 +162,7 @@ export const useEntriesStore = create<EntriesState>()(
   persist(
     (set) => ({
       entries: [],
+      pendingDeletions: [],
       addEntry: (data, fields, formTitle, createdAt) => {
         set((s) => {
           const now = Date.now();
@@ -125,15 +199,22 @@ export const useEntriesStore = create<EntriesState>()(
           return { entries: s.entries.filter((e) => e.id !== id) };
         });
         if (removed?.remoteId) {
-          supabase.from('entries').delete().eq('id', removed.remoteId).then(({ error }) => {
-            if (error) console.warn('[sync] best-effort remote delete failed', error);
-          });
-          const paths = photoStoragePaths(removed);
-          if (paths.length > 0) {
-            supabase.storage.from('entry-photos').remove(paths).then(({ error }) => {
-              if (error) console.warn('[sync] best-effort photo cleanup failed', error);
+          const pending: PendingDeletion = { remoteId: removed.remoteId, photoPaths: photoStoragePaths(removed) };
+          // Recorded synchronously, before the network call, so a failed or
+          // app-killed-mid-delete attempt is retried on the next sync pass
+          // (via processPendingDeletions) instead of silently orphaning the
+          // remote row — which would otherwise get re-downloaded by
+          // pullRemoteEntries and "resurrect" the entry locally.
+          set((s) => ({ pendingDeletions: [...s.pendingDeletions, pending] }));
+          attemptPendingDeletion(pending)
+            .then(() => {
+              useEntriesStore.setState((s) => ({
+                pendingDeletions: s.pendingDeletions.filter((p) => p.remoteId !== pending.remoteId),
+              }));
+            })
+            .catch((error) => {
+              console.warn('[sync] remote delete failed, will retry next sync pass', error);
             });
-          }
         }
       },
       // When `formTitle` is given, only entries belonging to that form are
@@ -149,17 +230,28 @@ export const useEntriesStore = create<EntriesState>()(
         set({ entries: allEntries.filter((e) => !toRemove.has(e.id)) });
         if (!deleteRemote) return;
 
-        const remoteIds = entries.map((e) => e.remoteId).filter((id): id is string => !!id);
-        const photoPaths = entries.flatMap((e) => (e.remoteId ? photoStoragePaths(e) : []));
-        if (remoteIds.length > 0) {
-          supabase.from('entries').delete().in('id', remoteIds).then(({ error }) => {
-            if (error) console.warn('[sync] best-effort bulk remote delete failed', error);
-          });
-        }
-        if (photoPaths.length > 0) {
-          supabase.storage.from('entry-photos').remove(photoPaths).then(({ error }) => {
-            if (error) console.warn('[sync] best-effort bulk photo cleanup failed', error);
-          });
+        const toDelete = entries.filter((e): e is Entry & { remoteId: string } => !!e.remoteId);
+        if (toDelete.length === 0) return;
+
+        const pendings: PendingDeletion[] = toDelete.map((e) => ({
+          remoteId: e.remoteId,
+          photoPaths: photoStoragePaths(e),
+        }));
+        // Recorded synchronously before the network calls — same reasoning
+        // as deleteEntry: a failed bulk delete must be retried next pass,
+        // not silently orphan rows that pullRemoteEntries would re-download.
+        set((s) => ({ pendingDeletions: [...s.pendingDeletions, ...pendings] }));
+
+        for (const pending of pendings) {
+          attemptPendingDeletion(pending)
+            .then(() => {
+              useEntriesStore.setState((s) => ({
+                pendingDeletions: s.pendingDeletions.filter((p) => p.remoteId !== pending.remoteId),
+              }));
+            })
+            .catch((error) => {
+              console.warn('[sync] bulk remote delete failed for one entry, will retry next sync pass', error);
+            });
         }
       },
       // Used when signing out and choosing to keep the cloud copy but wipe

@@ -108,53 +108,75 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     const applyUrl = (url: string | null) => {
       if (!url) return;
-      const parsed = new URL(url.replace('#', '?'));
-      const access_token = parsed.searchParams.get('access_token');
-      const refresh_token = parsed.searchParams.get('refresh_token');
-      const isRecovery = url.includes('reset-password-callback');
-      if (access_token && refresh_token) {
-        supabase.auth
-          .setSession({ access_token, refresh_token })
-          .then(() => {
-            // A password-reset email link signs the user into a temporary
-            // session — route them straight to "set a new password" instead
-            // of dropping them wherever they happened to be in the app.
-            if (isRecovery) router.replace('/(auth)/update-password');
-          })
-          .catch((e) => {
-            console.warn('[auth] setSession from deep link failed', e);
-          });
+      // Cheap guard against obviously-irrelevant deep links (any link to this
+      // app's own scheme, not just auth callbacks) before paying for a full
+      // URL parse below.
+      if (!url.includes('access_token=')) return;
+      try {
+        const parsed = new URL(url.replace('#', '?'));
+        const access_token = parsed.searchParams.get('access_token');
+        const refresh_token = parsed.searchParams.get('refresh_token');
+        const isRecovery = url.includes('reset-password-callback');
+        if (access_token && refresh_token) {
+          supabase.auth
+            .setSession({ access_token, refresh_token })
+            .then(() => {
+              // A password-reset email link signs the user into a temporary
+              // session — route them straight to "set a new password" instead
+              // of dropping them wherever they happened to be in the app.
+              if (isRecovery) router.replace('/(auth)/update-password');
+            })
+            .catch((e) => {
+              console.warn('[auth] setSession from deep link failed', e);
+            });
+        }
+      } catch (e) {
+        console.warn('[auth] failed to parse deep link url', e);
       }
     };
 
-    Linking.getInitialURL().then(applyUrl);
+    Linking.getInitialURL()
+      .then(applyUrl)
+      .catch((e) => console.warn('[auth] getInitialURL failed', e));
     Linking.addEventListener('url', ({ url }) => applyUrl(url));
   },
 
   signIn: async (email, password) => {
     set({ loading: true, error: null });
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    const message = error?.message ?? null;
-    set({ loading: false, error: message });
-    return { error: message };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const message = error?.message ?? null;
+      set({ loading: false, error: message });
+      return { error: message };
+    } catch (e: any) {
+      const message = e?.message ?? 'Sign-in failed';
+      set({ loading: false, error: message });
+      return { error: message };
+    }
   },
 
   signUp: async (email, password) => {
     set({ loading: true, error: null });
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: Linking.createURL('auth-callback') },
-    });
-    // Supabase returns no error for an already-registered email (to avoid
-    // leaking which emails exist) but the identities array comes back empty.
-    const message = error
-      ? error.message
-      : data.user && data.user.identities?.length === 0
-      ? 'An account with this email already exists'
-      : null;
-    set({ loading: false, error: message });
-    return { error: message };
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: Linking.createURL('auth-callback') },
+      });
+      // Supabase returns no error for an already-registered email (to avoid
+      // leaking which emails exist) but the identities array comes back empty.
+      const message = error
+        ? error.message
+        : data.user && data.user.identities?.length === 0
+        ? 'An account with this email already exists'
+        : null;
+      set({ loading: false, error: message });
+      return { error: message };
+    } catch (e: any) {
+      const message = e?.message ?? 'Sign-up failed';
+      set({ loading: false, error: message });
+      return { error: message };
+    }
   },
 
   signInWithGoogle: async () => {
@@ -201,20 +223,32 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   resetPassword: async (email) => {
     set({ loading: true, error: null });
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: Linking.createURL('reset-password-callback'),
-    });
-    const message = error?.message ?? null;
-    set({ loading: false, error: message });
-    return { error: message };
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: Linking.createURL('reset-password-callback'),
+      });
+      const message = error?.message ?? null;
+      set({ loading: false, error: message });
+      return { error: message };
+    } catch (e: any) {
+      const message = e?.message ?? 'Reset password failed';
+      set({ loading: false, error: message });
+      return { error: message };
+    }
   },
 
   updatePassword: async (newPassword) => {
     set({ loading: true, error: null });
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    const message = error?.message ?? null;
-    set({ loading: false, error: message });
-    return { error: message };
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const message = error?.message ?? null;
+      set({ loading: false, error: message });
+      return { error: message };
+    } catch (e: any) {
+      const message = e?.message ?? 'Update password failed';
+      set({ loading: false, error: message });
+      return { error: message };
+    }
   },
 
   signOut: async () => {

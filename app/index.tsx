@@ -87,19 +87,34 @@ export default function HomeScreen() {
   const activeFormSwipeRef = useRef<Swipeable>(null);
   const swipeFormRefs = useRef<Map<string, Swipeable>>(new Map());
   const entrySwipeRefs = useRef<Map<string, Swipeable>>(new Map());
+  // Guards against a rapid double-tap on "New entry" firing router.push
+  // twice (stacking a duplicate /collect screen) before the first
+  // navigation has had a chance to actually move us off this screen.
+  const navigatingRef = useRef(false);
 
+  const currentUserId = session?.user?.id ?? null;
+
+  // Same claim-flow semantics as entries: a form claimed by a different
+  // account must not appear in this account's (or a signed-out user's) list.
+  const ownedCustomForms = useMemo(
+    () =>
+      customForms.filter((f) =>
+        currentUserId ? f.userId === currentUserId || f.userId == null : f.userId == null,
+      ),
+    [customForms, currentUserId],
+  );
   const customPresets: FormPreset[] = useMemo(
     () =>
-      customForms
+      ownedCustomForms
         .filter(({ config }) => config?.formTitle && config?.fields)
         .map(({ importId, config }) => ({
           id: importId,
           config,
           custom: true,
         })),
-    [customForms],
+    [ownedCustomForms],
   );
-  const malformedCustomFormCount = customForms.length - customPresets.length;
+  const malformedCustomFormCount = ownedCustomForms.length - customPresets.length;
   const presets = useMemo(
     () =>
       [...INITIAL_PRESETS, ...customPresets].filter(
@@ -108,11 +123,24 @@ export default function HomeScreen() {
     [customPresets, hiddenPresetIds],
   );
   const formTitle = useMemo(() => schema?.formTitle ?? '—', [schema]);
+  // Entries belong to whichever account claimed them (or to nobody yet, if
+  // collected before signing in). Showing another already-claimed account's
+  // entries on this device would leak its data to whoever's currently signed
+  // in, so unclaimed (userId == null) entries stay visible to "whoever is
+  // using the device right now", but entries claimed by a different account
+  // never show up here.
+  const ownedEntries = useMemo(
+    () =>
+      entries.filter((e) =>
+        currentUserId ? e.userId === currentUserId || e.userId == null : e.userId == null,
+      ),
+    [entries, currentUserId],
+  );
   // Only entries collected under the currently active form — entries from
   // other (or deleted) forms must never show up on the home screen.
   const activeFormEntries = useMemo(
-    () => (schema ? entries.filter((e) => e.formTitle === schema.formTitle) : []),
-    [entries, schema],
+    () => (schema ? ownedEntries.filter((e) => e.formTitle === schema.formTitle) : []),
+    [ownedEntries, schema],
   );
   const sorted = useMemo(
     () => [...activeFormEntries].sort((a, b) => b.createdAt - a.createdAt),
@@ -563,7 +591,15 @@ export default function HomeScreen() {
             setSheet('config');
             return;
           }
+          // Ignore a second tap that lands before this one's navigation has
+          // taken effect — otherwise a fast double-tap can stack two
+          // /collect screens on top of each other.
+          if (navigatingRef.current) return;
+          navigatingRef.current = true;
           router.push('/collect');
+          setTimeout(() => {
+            navigatingRef.current = false;
+          }, 500);
         }}
         activeOpacity={schema ? 0.85 : 1}
       >

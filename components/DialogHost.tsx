@@ -9,7 +9,7 @@ import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 // in the app looks and behaves the same way. Mounted once in app/_layout.tsx.
 export default function DialogHost() {
   const visible = useDialogStore((s) => s.visible);
-  const options = useDialogStore((s) => s.options);
+  const options = useDialogStore((s) => s.current);
   const hide = useDialogStore((s) => s.hide);
   const colors = useAppColors();
   const styles = useThemedStyles(createStyles);

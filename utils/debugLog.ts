@@ -5,7 +5,7 @@ import { isDevModeEnabled } from '../store/devModeStore';
 // directly (and stay always-on); this is only for the "what's happening"
 // trace logs, so they don't spam every user's console in production.
 export function debugLog(...args: unknown[]) {
-  if (isDevModeEnabled()) {
+  if (__DEV__ && isDevModeEnabled()) {
     console.log(...args);
   }
 }

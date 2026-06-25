@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -20,18 +20,41 @@ import ScreenBubbles from '../../components/ScreenBubbles';
 
 // Reached only via the deep link from a password-reset email (see
 // authStore.ts's applyUrl) — by the time this screen renders, the user
-// already has a valid (temporary recovery) session.
+// should already have a valid (temporary recovery) session. We still guard
+// against that not having happened (e.g. an expired/malformed link) below.
 export default function UpdatePasswordScreen() {
   const colors = useAppColors();
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const updatePassword = useAuthStore((s) => s.updatePassword);
   const loading = useAuthStore((s) => s.loading);
+  const session = useAuthStore((s) => s.session);
+  const initialized = useAuthStore((s) => s.initialized);
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // No recovery session means the deep link flow didn't complete (expired
+    // link, malformed link, or the screen was reached some other way) — send
+    // the user back to login rather than letting them sit on a dead form.
+    // Two guards against false positives: wait for `initialized` (until the
+    // initial getSession()/listener setup resolves, `session` reads null
+    // even for a legitimate recovery session that's about to land), and a
+    // short grace delay on top of that — if Expo Router's own deep-link
+    // handling lands us on this screen slightly before authStore's Linking
+    // listener finishes applying the recovery session, give it a moment to
+    // catch up rather than bouncing the user immediately.
+    if (!initialized || session) return;
+    const timer = setTimeout(() => {
+      if (!useAuthStore.getState().session) {
+        router.replace('/(auth)/login');
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [initialized, session]);
 
   const handleSubmit = async () => {
     setError(null);
@@ -68,6 +91,13 @@ export default function UpdatePasswordScreen() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
+        <TouchableOpacity
+          style={styles.closeBtn}
+          onPress={() => router.replace('/(auth)/login')}
+        >
+          <MaterialIcons name="close" size={24} color={colors.text.secondary} />
+        </TouchableOpacity>
+
         <Text style={styles.title}>Set a new password</Text>
         <Text style={styles.subtitle}>Choose a new password for your account</Text>
 
@@ -138,6 +168,11 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   content: {
     paddingHorizontal: 24,
     flexGrow: 1,
+  },
+  closeBtn: {
+    alignSelf: 'flex-end',
+    padding: 6,
+    marginBottom: 8,
   },
   title: {
     fontSize: 26,

@@ -145,32 +145,34 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Developer</Text>
-        <View style={[styles.row, devModeEnabled && styles.rowGroupTop]}>
-          <MaterialIcons name="developer-mode" size={22} color={colors.text.secondary} />
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>Developer mode</Text>
-            <Text style={styles.rowSub}>Enables debug logging and developer tools</Text>
-          </View>
-          <Switch
-            value={devModeEnabled}
-            onValueChange={setDevModeEnabled}
-            trackColor={{ false: colors.border.default, true: colors.brand.primary }}
-            thumbColor={colors.background.white}
-          />
-        </View>
-
-        {devModeEnabled && (
-          <TouchableOpacity style={[styles.row, styles.rowGroupBottom]} onPress={handleSeedTestEntries}>
-            <MaterialIcons name="science" size={22} color={colors.text.secondary} />
+      {__DEV__ && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Developer</Text>
+          <View style={[styles.row, devModeEnabled && styles.rowGroupTop]}>
+            <MaterialIcons name="developer-mode" size={22} color={colors.text.secondary} />
             <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>Add 100 test entries</Text>
-              <Text style={styles.rowSub}>Stress-test data for Erwtimatologio Simiou</Text>
+              <Text style={styles.rowTitle}>Developer mode</Text>
+              <Text style={styles.rowSub}>Enables debug logging and developer tools</Text>
             </View>
-          </TouchableOpacity>
-        )}
-      </View>
+            <Switch
+              value={devModeEnabled}
+              onValueChange={setDevModeEnabled}
+              trackColor={{ false: colors.border.default, true: colors.brand.primary }}
+              thumbColor={colors.background.white}
+            />
+          </View>
+
+          {devModeEnabled && (
+            <TouchableOpacity style={[styles.row, styles.rowGroupBottom]} onPress={handleSeedTestEntries}>
+              <MaterialIcons name="science" size={22} color={colors.text.secondary} />
+              <View style={styles.rowBody}>
+                <Text style={styles.rowTitle}>Add 100 test entries</Text>
+                <Text style={styles.rowSub}>Stress-test data for Erwtimatologio Simiou</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 }

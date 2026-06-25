@@ -56,11 +56,23 @@ export default function CollectScreen() {
       if (!isMountedRef.current) return;
       setField(fieldId, loc);
       setGpsStatus('done');
-    } catch {
+    } catch (e) {
       if (!isMountedRef.current) return;
       setGpsStatus('idle');
+      // captureLocation() (utils/sensors.ts) throws a plain Error with a
+      // specific message for the two known failure modes — distinguish them
+      // for the user, and fall back to a generic message for anything else
+      // (e.g. location services disabled at the OS level).
+      const message = e instanceof Error ? e.message : '';
+      if (message === 'Location permission denied') {
+        showSnack('Location permission denied — enable it in settings to capture GPS.');
+      } else if (message === 'GPS capture timed out') {
+        showSnack('GPS capture timed out — try again outdoors or with a clearer signal.');
+      } else {
+        showSnack('Could not get your location — check location permissions and try again.');
+      }
     }
-  }, [setField, setGpsStatus]);
+  }, [setField, setGpsStatus, showSnack]);
 
   useEffect(() => {
     isMountedRef.current = true;

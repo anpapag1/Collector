@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-nativ
 import { MaterialIcons } from '@expo/vector-icons';
 import { FieldDef, OtherValue, SelectValue } from '../../types';
 import { isOtherValue } from '../../utils/formLogic';
+import { showDialog } from '../../store/dialogStore';
 import { AppColors } from '../../theme/colors';
 import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
@@ -36,9 +37,30 @@ function SelectField({ field, value, onChange, error }: Props) {
           ? current.filter((v) => isOtherValue(v) || v !== opt)
           : [...current, opt],
       );
-    } else {
-      onChange(isOptSelected(opt) ? '' : opt);
+      return;
     }
+
+    // Single-select: switching to a normal option replaces the whole value,
+    // including any in-progress "Other" free text. Warn before discarding
+    // anything the user actually typed; nothing to lose if it's empty.
+    const hasTypedOtherText = !!otherEntry?.otherText?.trim();
+    if (!isOptSelected(opt) && hasTypedOtherText) {
+      showDialog({
+        title: 'Discard "Other" text?',
+        message: `Switching to "${opt}" will discard the text you entered for "Other".`,
+        actions: [
+          { label: 'Keep editing', style: 'cancel' },
+          {
+            label: 'Discard',
+            style: 'destructive',
+            onPress: () => onChange(opt),
+          },
+        ],
+      });
+      return;
+    }
+
+    onChange(isOptSelected(opt) ? '' : opt);
   };
 
   const toggleOther = () => {

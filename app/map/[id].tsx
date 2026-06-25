@@ -7,6 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEntriesStore } from '../../store/entriesStore';
 import { useFormStore } from '../../store/formStore';
+import { useAuthStore } from '../../store/authStore';
 import { entryLocation, googleMapsUrl, mapRegion, MapPoint } from '../../utils/mapHelpers';
 import { getEntryDisplayNumbers } from '../../utils/entryNumbering';
 import { AppColors } from '../../theme/colors';
@@ -21,11 +22,23 @@ export default function MapScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const allEntries = useEntriesStore((s) => s.entries);
   const schema = useFormStore((s) => s.schema);
+  const session = useAuthStore((s) => s.session);
+  const currentUserId = session?.user?.id ?? null;
+  // Only show pins owned by the signed-in account (plus not-yet-claimed
+  // local entries) — another already-claimed account's pins must not leak
+  // onto the map on a shared device.
+  const ownedEntries = useMemo(
+    () =>
+      allEntries.filter((e) =>
+        currentUserId ? e.userId === currentUserId || e.userId == null : e.userId == null,
+      ),
+    [allEntries, currentUserId],
+  );
   // Only show pins for the currently active form — entries from other forms
   // must not leak onto the map.
   const entries = useMemo(
-    () => (schema ? allEntries.filter((e) => e.formTitle === schema.formTitle) : []),
-    [allEntries, schema],
+    () => (schema ? ownedEntries.filter((e) => e.formTitle === schema.formTitle) : []),
+    [ownedEntries, schema],
   );
   const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
   const [selected, setSelected] = useState<MapPoint | null>(null);
@@ -33,9 +46,19 @@ export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
+    let isMounted = true;
     Location.requestForegroundPermissionsAsync()
-      .then(({ status }) => setShowsUserLocation(status === 'granted'))
-      .catch(() => setShowsUserLocation(false));
+      .then(({ status }) => {
+        if (!isMounted) return;
+        setShowsUserLocation(status === 'granted');
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setShowsUserLocation(false);
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const mapPoints = useMemo(

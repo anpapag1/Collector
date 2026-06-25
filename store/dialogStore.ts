@@ -14,16 +14,35 @@ export type DialogOptions = {
 
 type DialogState = {
   visible: boolean;
-  options: DialogOptions | null;
+  current: DialogOptions | null;
+  queue: DialogOptions[];
   show: (options: DialogOptions) => void;
   hide: () => void;
 };
 
-export const useDialogStore = create<DialogState>()((set) => ({
+export const useDialogStore = create<DialogState>()((set, get) => ({
   visible: false,
-  options: null,
-  show: (options) => set({ visible: true, options }),
-  hide: () => set({ visible: false }),
+  current: null,
+  queue: [],
+  show: (options) => {
+    const { visible, queue } = get();
+    if (!visible) {
+      // Nothing showing right now — display this one immediately.
+      set({ visible: true, current: options, queue: [] });
+    } else {
+      // Something's already up — queue this one for after.
+      set({ queue: [...queue, options] });
+    }
+  },
+  hide: () => {
+    const { queue } = get();
+    if (queue.length > 0) {
+      const [next, ...rest] = queue;
+      set({ visible: true, current: next, queue: rest });
+    } else {
+      set({ visible: false, current: null });
+    }
+  },
 }));
 
 // Imperative entry point — mirrors Alert.alert's ergonomics (callable from

@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEntriesStore } from '../../store/entriesStore';
+import { showDialog } from '../../store/dialogStore';
 import { isFieldFilled, isFieldVisible } from '../../utils/formLogic';
 import DynamicForm from '../../components/DynamicForm';
 import Toast from '../../components/Toast';
@@ -24,6 +25,18 @@ export default function EditEntryScreen() {
   const [draft, setDraft] = useState(entry?.data ?? {});
   const [showErrors, setShowErrors] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  // Snapshot of the entry's remote freshness at mount, so we can detect
+  // whether a remote pull (refreshEntryFromRemote in entriesStore, triggered
+  // by syncEngine while this screen is open) has updated it underneath us.
+  // Deliberately does NOT fall back to updatedAt: refreshEntryFromRemote only
+  // ever runs on an already-`synced` entry (pullRemoteEntries skips anything
+  // else), so remoteUpdatedAt is the only field that can change for the
+  // reason we care about. If it's null at mount (entry has never synced yet),
+  // there's no remote copy to conflict with — markSynced setting it for the
+  // first time while this screen is open is just this device's own pending
+  // edit going up, not another device's change, so it must not trigger the
+  // warning below.
+  const mountedRemoteUpdatedAtRef = useRef(entry?.remoteUpdatedAt ?? null);
 
   // Photos and GPS aren't editable yet — fixing a typo shouldn't risk the
   // location/photos captured at collection time. Only render the rest.
@@ -51,6 +64,46 @@ export default function EditEntryScreen() {
       setSnackbar('Fill in all required fields');
       return;
     }
+
+    // Re-read the live entry rather than trusting the closed-over `entry` —
+    // if syncEngine's pull called refreshEntryFromRemote while this screen
+    // was open, the store now holds fresher data than what this draft was
+    // seeded from, and saving would silently clobber it.
+    const liveEntry = useEntriesStore.getState().entries.find((e) => e.id === entry.id);
+    const liveRemoteUpdatedAt = liveEntry?.remoteUpdatedAt ?? null;
+    const staleSnapshot = mountedRemoteUpdatedAtRef.current;
+    const changedRemotely =
+      liveEntry !== undefined && staleSnapshot !== null && liveRemoteUpdatedAt !== staleSnapshot;
+
+    if (changedRemotely) {
+      showDialog({
+        title: 'Entry updated elsewhere',
+        message:
+          'This entry was changed on another device while you were editing it. Overwrite it with your changes, or discard your changes and load the latest version?',
+        actions: [
+          {
+            label: 'Discard mine',
+            style: 'cancel',
+            onPress: () => {
+              if (liveEntry) {
+                setDraft(liveEntry.data);
+                mountedRemoteUpdatedAtRef.current = liveRemoteUpdatedAt;
+              }
+            },
+          },
+          {
+            label: 'Overwrite',
+            style: 'destructive',
+            onPress: () => {
+              updateEntry(entry.id, draft);
+              router.back();
+            },
+          },
+        ],
+      });
+      return;
+    }
+
     updateEntry(entry.id, draft);
     router.back();
   }, [entry, editableFields, draft, updateEntry]);
