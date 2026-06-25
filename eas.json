@@ -4,13 +4,20 @@
     "appVersionSource": "local"
   },
   "build": {
+    "base": {
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
     "internal": {
+      "extends": "base",
       "android": {
         "buildType": "apk",
         "distribution": "internal"
       }
     },
     "production": {
+      "extends": "base",
       "android": {
         "buildType": "app-bundle",
         "autoIncrement": true
