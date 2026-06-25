@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,8 +28,14 @@ export default function ExportScreen() {
   const colors = useAppColors();
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
-  const entries = useEntriesStore((s) => s.entries);
+  const allEntries = useEntriesStore((s) => s.entries);
   const schema = useFormStore((s) => s.schema);
+  // Export only the active form's entries — other forms' data shouldn't
+  // leak into this form's export file.
+  const entries = useMemo(
+    () => (schema ? allEntries.filter((e) => e.formTitle === schema.formTitle) : []),
+    [allEntries, schema],
+  );
 
   const [phase, setPhase] = useState<Phase>('summary');
   const [exportKind, setExportKind] = useState<ExportKind>('zip');

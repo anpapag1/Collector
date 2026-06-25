@@ -76,7 +76,7 @@ type EntriesState = {
   addEntry: (data: EntryData, fields: FieldDef[], formTitle: string, createdAt?: number) => void;
   updateEntry: (id: string, data: EntryData) => void;
   deleteEntry: (id: string) => void;
-  clearEntries: (options?: { deleteRemote?: boolean }) => void;
+  clearEntries: (options?: { deleteRemote?: boolean; formTitle?: string }) => void;
   clearLocalOnly: () => void;
   markSyncing: (id: string) => void;
   markSynced: (id: string, remoteId: string, remoteUpdatedAt: number) => void;
@@ -136,9 +136,17 @@ export const useEntriesStore = create<EntriesState>()(
           }
         }
       },
-      clearEntries: ({ deleteRemote = true }: { deleteRemote?: boolean } = {}) => {
-        const entries = useEntriesStore.getState().entries;
-        set({ entries: [] });
+      // When `formTitle` is given, only entries belonging to that form are
+      // removed (used for "Delete all" scoped to the active form, and for
+      // cascading entry deletion when a form is deleted) — other forms'
+      // entries are left untouched.
+      clearEntries: ({ deleteRemote = true, formTitle }: { deleteRemote?: boolean; formTitle?: string } = {}) => {
+        const allEntries = useEntriesStore.getState().entries;
+        const entries = formTitle === undefined ? allEntries : allEntries.filter((e) => e.formTitle === formTitle);
+        if (entries.length === 0) return;
+
+        const toRemove = new Set(entries.map((e) => e.id));
+        set({ entries: allEntries.filter((e) => !toRemove.has(e.id)) });
         if (!deleteRemote) return;
 
         const remoteIds = entries.map((e) => e.remoteId).filter((id): id is string => !!id);

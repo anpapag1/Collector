@@ -6,6 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable, FlatList } from 'react-native-gesture-handler';
 import { useEntriesStore } from '../store/entriesStore';
+import { useFormStore } from '../store/formStore';
 import EntryCard from '../components/EntryCard';
 import Toast from '../components/Toast';
 import type { Entry } from '../types';
@@ -22,8 +23,15 @@ export default function EntriesScreen() {
   const colors = useAppColors();
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
-  const entries = useEntriesStore((s) => s.entries);
+  const allEntries = useEntriesStore((s) => s.entries);
   const deleteEntry = useEntriesStore((s) => s.deleteEntry);
+  const schema = useFormStore((s) => s.schema);
+  // Only entries collected under the currently active form belong here —
+  // other forms' entries must not show up in this list.
+  const entries = useMemo(
+    () => (schema ? allEntries.filter((e) => e.formTitle === schema.formTitle) : []),
+    [allEntries, schema],
+  );
 
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const snackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,7 +119,7 @@ export default function EntriesScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.screenTitle}>All entries</Text>
+        <Text style={styles.screenTitle} numberOfLines={1}>{schema?.formTitle ?? 'All entries'}</Text>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/export')}>
           <MaterialIcons name="ios-share" size={23} color={colors.text.primary} />
         </TouchableOpacity>

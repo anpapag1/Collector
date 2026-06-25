@@ -350,19 +350,47 @@ async function pullRemoteForms(userId: string): Promise<void> {
   }
 
   const local = usePickerStore.getState().customForms;
-  const existingKeys = new Set(local.map((c) => `${c.config.formId}@${c.config.version}`));
-  const missing = (rows ?? []).filter((row) => !existingKeys.has(`${row.form_id}@${row.version}`));
+  const localUserForms = local.filter((c) => c.userId === userId);
+
+  const serverKeys = new Set((rows ?? []).map((row) => `${row.form_id}@${row.version}`));
+  const localKeys = new Set(localUserForms.map((c) => `${c.config.formId}@${c.config.version}`));
+
+  const missing = (rows ?? []).filter((row) => !localKeys.has(`${row.form_id}@${row.version}`));
+  const extraLocal = localUserForms.filter((c) => !serverKeys.has(`${c.config.formId}@${c.config.version}`));
+
+  // If a local form isn't on the server, it was either added offline and push failed,
+  // or it was synced and then deleted on another device.
+  // Locally-added forms have an importId starting with 'custom-'.
+  for (const c of extraLocal) {
+    if (c.importId.startsWith('custom-')) {
+      supabase
+        .from('forms')
+        .upsert({
+          user_id: userId,
+          form_id: c.config.formId,
+          form_title: c.config.formTitle,
+          version: c.config.version,
+          schema: c.config,
+        }, { onConflict: 'user_id,form_id,version' })
+        .then(({ error }) => {
+          if (error) console.warn('[sync] form offline-add push failed', error);
+        });
+    }
+  }
+
+  usePickerStore.getState().removeRemoteDeletedForms(serverKeys, userId);
+
   if (missing.length === 0) return;
 
   // A row's `schema` jsonb is trusted at push time (it came from a locally
   // validated import), but another device, a manual DB edit, or future
   // schema drift could still land something malformed here — re-validate
   // before it's allowed into this device's picker rather than trusting it.
-  const valid: { importId: string; config: FormConfig }[] = [];
+  const valid: { importId: string; config: FormConfig; userId: string }[] = [];
   for (const row of missing) {
     try {
       const config = validateFormConfig(row.schema);
-      valid.push({ importId: row.id, config });
+      valid.push({ importId: row.id, config, userId });
     } catch (err) {
       console.warn('[sync] skipped invalid pulled form', row.form_id, err);
       Sentry.captureException(err);

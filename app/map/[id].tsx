@@ -6,6 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEntriesStore } from '../../store/entriesStore';
+import { useFormStore } from '../../store/formStore';
 import { entryLocation, googleMapsUrl, mapRegion, MapPoint } from '../../utils/mapHelpers';
 import { getEntryDisplayNumbers } from '../../utils/entryNumbering';
 import { AppColors } from '../../theme/colors';
@@ -18,7 +19,14 @@ export default function MapScreen() {
   const themeMode = useThemeStore((s) => s.mode);
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const entries = useEntriesStore((s) => s.entries);
+  const allEntries = useEntriesStore((s) => s.entries);
+  const schema = useFormStore((s) => s.schema);
+  // Only show pins for the currently active form — entries from other forms
+  // must not leak onto the map.
+  const entries = useMemo(
+    () => (schema ? allEntries.filter((e) => e.formTitle === schema.formTitle) : []),
+    [allEntries, schema],
+  );
   const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
   const [selected, setSelected] = useState<MapPoint | null>(null);
   const [showsUserLocation, setShowsUserLocation] = useState(false);

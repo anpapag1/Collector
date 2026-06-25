@@ -22,7 +22,7 @@ type Props = {
   onFieldChange: (id: string, value: any) => void;
   onAddPhotoPress: (fieldId: string) => void;
   gpsStatus?: GpsStatus;
-  onGpsCapture?: () => void;
+  onGpsCapture?: (fieldId: string) => void;
 };
 
 function DynamicForm({
@@ -113,7 +113,7 @@ function renderField(
     getFieldChangeHandler: (id: string) => (value: any) => void;
     onAddPhotoPress: (fieldId: string) => void;
     gpsStatus: GpsStatus;
-    onGpsCapture?: () => void;
+    onGpsCapture?: (fieldId: string) => void;
   },
 ) {
   switch (field.type) {
@@ -205,7 +205,7 @@ function renderField(
           coords={coords}
           accuracy={accuracy}
           address={loc?.address}
-          onCapture={ctx.onGpsCapture ?? (() => {})}
+          onCapture={() => ctx.onGpsCapture?.(field.id)}
           error={error}
         />
       );

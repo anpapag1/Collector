@@ -8,6 +8,7 @@ import Constants from 'expo-constants';
 import { useAuthStore } from '../store/authStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { usePickerStore } from '../store/pickerStore';
+import { useFormStore } from '../store/formStore';
 import { useDevModeStore } from '../store/devModeStore';
 import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
@@ -73,6 +74,7 @@ export default function SettingsScreen() {
           onPress: () => {
             clearLocalOnly();
             clearLocalForms();
+            useFormStore.getState().clearSchema();
             signOut();
           },
         },

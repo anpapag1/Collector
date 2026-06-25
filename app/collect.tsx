@@ -49,12 +49,12 @@ export default function CollectScreen() {
     snackTimer.current = setTimeout(() => setSnackbar(null), 2600);
   }, []);
 
-  const runGps = useCallback(async () => {
+  const runGps = useCallback(async (fieldId: string) => {
     setGpsStatus('capturing');
     try {
       const loc = await captureLocation();
       if (!isMountedRef.current) return;
-      setField('location', loc);
+      setField(fieldId, loc);
       setGpsStatus('done');
     } catch {
       if (!isMountedRef.current) return;
@@ -79,7 +79,7 @@ export default function CollectScreen() {
     if (hasRestoredDraft) return;
     resetDraft();
     const gpsField = schema.fields.find((f) => f.type === 'gps');
-    if (gpsField?.auto) runGps();
+    if (gpsField?.auto) runGps(gpsField.id);
     schema.fields
       .filter((f) => f.type === 'date' && f.auto)
       .forEach((f) => setField(f.id, new Date().toISOString()));

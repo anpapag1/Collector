@@ -55,6 +55,7 @@ type PickerState = {
   removeCustomForm: (importId: string) => void;
   setActivePresetId: (id: string | null) => void;
   mergeRemoteForms: (forms: CustomForm[]) => void;
+  removeRemoteDeletedForms: (serverKeys: Set<string>, userId: string) => void;
   claimCustomFormsForUser: (userId: string) => void;
   discardUnclaimedCustomForms: () => void;
   clearLocalForms: () => void;
@@ -112,7 +113,58 @@ export const usePickerStore = create<PickerState>()(
             (f) => !existingKeys.has(`${f.config.formId}@${f.config.version}`)
           );
           if (toAdd.length === 0) return state;
-          return { customForms: [...state.customForms, ...toAdd] };
+
+          const newState: Partial<PickerState> = {
+            customForms: [...state.customForms, ...toAdd],
+          };
+
+          if (!state.activePresetId && toAdd.length > 0) {
+            const firstNew = toAdd[0];
+            newState.activePresetId = firstNew.importId;
+            setTimeout(() => {
+              const formStore = require('./formStore').useFormStore.getState();
+              if (!formStore.schema) {
+                formStore.loadSchema(firstNew.config);
+              }
+            }, 0);
+          }
+
+          return newState;
+        });
+      },
+      removeRemoteDeletedForms: (serverKeys, userId) => {
+        set((state) => {
+          const toKeep = state.customForms.filter(
+            (c) => c.userId !== userId || serverKeys.has(`${c.config.formId}@${c.config.version}`)
+          );
+
+          if (toKeep.length === state.customForms.length) return state;
+
+          const removed = state.customForms.filter((c) => !toKeep.includes(c));
+          const removedIds = new Set(removed.map((c) => c.importId));
+
+          const newActivePresetId =
+            state.activePresetId && removedIds.has(state.activePresetId)
+              ? null
+              : state.activePresetId;
+
+          if (newActivePresetId === null && state.activePresetId !== null) {
+            setTimeout(() => {
+              require('./formStore').useFormStore.getState().clearSchema();
+            }, 0);
+          }
+
+          // A form deleted on another device is still gone from under its
+          // entries here — same cascade as deleting it locally, so nothing
+          // orphaned is left behind on this device either.
+          setTimeout(() => {
+            const { clearEntries } = require('./entriesStore').useEntriesStore.getState();
+            for (const c of removed) {
+              clearEntries({ formTitle: c.config.formTitle });
+            }
+          }, 0);
+
+          return { customForms: toKeep, activePresetId: newActivePresetId };
         });
       },
       // Mirrors entriesStore/migrateLegacyEntries' claim flow: forms imported
@@ -138,7 +190,7 @@ export const usePickerStore = create<PickerState>()(
       // Used when signing out and choosing to wipe this device's cached
       // forms — never touches Supabase, just clears the local cache (same
       // contract as entriesStore.clearLocalOnly).
-      clearLocalForms: () => set({ customForms: [] }),
+      clearLocalForms: () => set({ customForms: [], activePresetId: null }),
     }),
     {
       name: 'picker-storage',

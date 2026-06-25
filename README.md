@@ -43,4 +43,4 @@ npm run ios        # expo run:ios
 
 ## Creating your own forms
 
-Collector can load any form that follows its form-config schema. See [form_creation_instructions.md](form_creation_instructions.md) for the full guide on building and importing a custom form.
+Collector can load any form that follows its form-config schema. See [docs/form_creation_instructions.md](docs/form_creation_instructions.md) for the full guide on building and importing a custom form.

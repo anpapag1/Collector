@@ -108,23 +108,44 @@ export default function HomeScreen() {
     [customPresets, hiddenPresetIds],
   );
   const formTitle = useMemo(() => schema?.formTitle ?? '—', [schema]);
+  // Only entries collected under the currently active form — entries from
+  // other (or deleted) forms must never show up on the home screen.
+  const activeFormEntries = useMemo(
+    () => (schema ? entries.filter((e) => e.formTitle === schema.formTitle) : []),
+    [entries, schema],
+  );
   const sorted = useMemo(
-    () => [...entries].sort((a, b) => b.createdAt - a.createdAt),
-    [entries],
+    () => [...activeFormEntries].sort((a, b) => b.createdAt - a.createdAt),
+    [activeFormEntries],
   );
   const recent = useMemo(() => sorted.slice(0, 3), [sorted]);
-  const total = useMemo(() => entries.length, [entries]);
-  const displayNumbers = useMemo(() => getEntryDisplayNumbers(entries), [entries]);
+  const total = useMemo(() => activeFormEntries.length, [activeFormEntries]);
+  const displayNumbers = useMemo(() => getEntryDisplayNumbers(activeFormEntries), [activeFormEntries]);
 
   const globalSyncStatus = useMemo<'synced' | 'syncing' | 'pending' | 'error' | null>(() => {
     if (!session) return null;
-    if (entries.some((e) => e.syncStatus === 'error')) return 'error';
-    if (entries.some((e) => e.syncStatus === 'syncing')) return 'syncing';
-    if (entries.some((e) => e.syncStatus === 'pending')) return 'pending';
+    if (activeFormEntries.some((e) => e.syncStatus === 'error')) return 'error';
+    if (activeFormEntries.some((e) => e.syncStatus === 'syncing')) return 'syncing';
+    if (activeFormEntries.some((e) => e.syncStatus === 'pending')) return 'pending';
     return 'synced';
-  }, [session, entries]);
+  }, [session, activeFormEntries]);
 
   const syncPulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (sheet === null) {
+      const isActiveValid = activePresetId && presets.some((p) => p.id === activePresetId);
+      if (!isActiveValid) {
+        if (presets.length > 0) {
+          loadSchema(presets[0].config);
+          setActivePresetId(presets[0].id);
+        } else {
+          useFormStore.getState().clearSchema();
+          setActivePresetId(null);
+        }
+      }
+    }
+  }, [sheet, activePresetId, presets, loadSchema, setActivePresetId]);
 
   useEffect(() => {
     if (globalSyncStatus !== 'syncing') {
@@ -230,6 +251,10 @@ export default function HomeScreen() {
             } else {
               hidePreset(presetId);
             }
+            // Deleting a form also deletes everything collected under it —
+            // otherwise its entries would be orphaned, with no form left to
+            // view or export them from.
+            clearEntries({ formTitle: preset.config.formTitle });
 
             // Read live store state instead of the closed-over `presets`/`activePresetId`
             // variables, which may be stale by the time this async alert callback fires.
@@ -245,9 +270,6 @@ export default function HomeScreen() {
               useFormStore.getState().clearSchema();
               usePickerStore.getState().setActivePresetId(null);
               showSnack('No forms left — import a form to continue');
-            } else if (pickerState.activePresetId === presetId) {
-              useFormStore.getState().loadSchema(liveRemaining[0].config);
-              usePickerStore.getState().setActivePresetId(liveRemaining[0].id);
             }
           },
         },
@@ -328,7 +350,7 @@ export default function HomeScreen() {
           label: 'Delete all',
           style: 'destructive',
           onPress: () => {
-            clearEntries();
+            clearEntries({ formTitle: schema?.formTitle });
             showSnack('All entries deleted');
           },
         },
