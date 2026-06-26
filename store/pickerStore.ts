@@ -8,10 +8,59 @@ export type CustomForm = {
   importId: string;
   config: FormConfig;
   userId?: string | null;
+  // The server-side `forms.id` primary key, known once the form has been
+  // pushed to or pulled from Supabase. This is the STABLE identity of the
+  // remote row and is what makes sync survive an out-of-band ownership change:
+  // the admin dashboard can reassign a form to another owner by directly
+  // updating `forms.user_id`, so the (user_id, form_id, version) tuple is NOT
+  // stable. Matching/updating by `remoteId` (the PK) is. Undefined/null means
+  // "not yet on the server" (e.g. imported offline).
+  remoteId?: string | null;
 };
 
-function pushFormToSupabase(config: FormConfig, userId: string) {
-  supabase
+// Pushes a locally-held custom form to Supabase.
+//
+// Critical for ownership transfers: once we know the form's server primary key
+// (`remoteId`), we UPDATE that exact row by id rather than upserting on
+// (user_id, form_id, version). The admin dashboard reassigns a form to another
+// owner by directly setting `forms.user_id`; after that, an upsert keyed on
+// (user_id, form_id, version) would find no row matching the ORIGINAL owner and
+// INSERT a brand-new duplicate under them. Updating by primary key instead
+// affects 0 rows under RLS once the form is no longer ours — which the caller's
+// pull pass detects and treats as "no longer mine", dropping the stale copy.
+//
+// Returns a Promise (callers that need the recorded remoteId before continuing
+// can await it); it never throws — failures are logged.
+export async function pushFormToSupabase(
+  importId: string,
+  config: FormConfig,
+  userId: string,
+  remoteId?: string | null
+): Promise<void> {
+  if (remoteId) {
+    const { data, error } = await supabase
+      .from('forms')
+      .update({ form_title: config.formTitle, schema: config })
+      .eq('id', remoteId)
+      .select('id');
+    if (error) {
+      console.warn('[sync] form update failed', error);
+      return;
+    }
+    if (!data || data.length === 0) {
+      // The row is gone or has been reassigned to another owner (RLS now hides
+      // it from us). Either way it's no longer ours — do NOT fall through to an
+      // insert (that's the duplication bug). The next pull reconciles the local
+      // cache; nothing more to do here.
+      console.warn('[sync] form push: row no longer owned by this user (deleted or reassigned)');
+    }
+    return;
+  }
+
+  // No known server PK yet (fresh import, or imported offline before sign-in):
+  // insert via upsert and remember the assigned id so subsequent pushes match
+  // by primary key instead of the ownership-fragile tuple.
+  const { data, error } = await supabase
     .from('forms')
     .upsert(
       {
@@ -23,25 +72,33 @@ function pushFormToSupabase(config: FormConfig, userId: string) {
       },
       { onConflict: 'user_id,form_id,version' }
     )
-    .then(({ error }) => {
-      if (error) console.warn('[sync] form upload failed', error);
-    });
+    .select('id')
+    .single();
+  if (error) {
+    console.warn('[sync] form upload failed', error);
+    return;
+  }
+  if (data?.id) {
+    usePickerStore.getState().setFormRemoteId(importId, data.id);
+  }
 }
 
 // Best-effort remote delete, mirroring entriesStore/deleteEntry's pattern.
-// Forms don't store a separate remoteId locally, so the (user_id, form_id,
-// version) unique key doubles as the match condition. RLS already scopes
-// deletes to auth.uid() = user_id, so this is safe even if userId were stale.
-function deleteFormFromSupabase(config: FormConfig, userId: string) {
-  supabase
-    .from('forms')
-    .delete()
-    .eq('user_id', userId)
-    .eq('form_id', config.formId)
-    .eq('version', config.version)
-    .then(({ error }) => {
-      if (error) console.warn('[sync] best-effort form remote delete failed', error);
-    });
+// Prefer deleting by the primary key when known (exact + ownership-stable);
+// fall back to the (user_id, form_id, version) tuple for forms that predate
+// remoteId tracking. RLS already scopes deletes to auth.uid() = user_id.
+function deleteFormFromSupabase(config: FormConfig, userId: string, remoteId?: string | null) {
+  const query = remoteId
+    ? supabase.from('forms').delete().eq('id', remoteId)
+    : supabase
+        .from('forms')
+        .delete()
+        .eq('user_id', userId)
+        .eq('form_id', config.formId)
+        .eq('version', config.version);
+  query.then(({ error }) => {
+    if (error) console.warn('[sync] best-effort form remote delete failed', error);
+  });
 }
 
 type PickerState = {
@@ -55,6 +112,10 @@ type PickerState = {
   claimCustomFormsForUser: (userId: string) => void;
   discardUnclaimedCustomForms: () => void;
   clearLocalForms: () => void;
+  // Records the server primary key for a locally-held form (after a push, or
+  // backfilled during a pull for forms imported before remoteId tracking).
+  setFormRemoteId: (importId: string, remoteId: string) => void;
+  setFormRemoteIds: (pairs: { importId: string; remoteId: string }[]) => void;
 };
 
 export const usePickerStore = create<PickerState>()(
@@ -74,7 +135,8 @@ export const usePickerStore = create<PickerState>()(
         // authStore here) so this store doesn't import authStore — avoids
         // a pickerStore <-> authStore <-> syncEngine require cycle.
         if (!userId) return;
-        pushFormToSupabase(config, userId);
+        // Fresh import: no remoteId yet — push inserts and records the PK.
+        pushFormToSupabase(importId, config, userId, null);
       },
       removeCustomForm: (importId) => {
         const removed = get().customForms.find((c) => c.importId === importId);
@@ -84,7 +146,7 @@ export const usePickerStore = create<PickerState>()(
             state.activePresetId === importId ? null : state.activePresetId,
         }));
         if (removed?.userId) {
-          deleteFormFromSupabase(removed.config, removed.userId);
+          deleteFormFromSupabase(removed.config, removed.userId, removed.remoteId);
         }
       },
       setActivePresetId: (id) => set({ activePresetId: id }),
@@ -171,7 +233,9 @@ export const usePickerStore = create<PickerState>()(
           ),
         }));
         for (const form of unclaimed) {
-          pushFormToSupabase(form.config, userId);
+          // Newly-claimed forms have never been on the server (they were
+          // unclaimed); push inserts and records the PK.
+          pushFormToSupabase(form.importId, form.config, userId, form.remoteId ?? null);
         }
       },
       discardUnclaimedCustomForms: () => {
@@ -183,6 +247,22 @@ export const usePickerStore = create<PickerState>()(
       // forms — never touches Supabase, just clears the local cache (same
       // contract as entriesStore.clearLocalOnly).
       clearLocalForms: () => set({ customForms: [], activePresetId: null }),
+      setFormRemoteId: (importId, remoteId) =>
+        set((state) => ({
+          customForms: state.customForms.map((c) =>
+            c.importId === importId ? { ...c, remoteId } : c
+          ),
+        })),
+      setFormRemoteIds: (pairs) =>
+        set((state) => {
+          if (pairs.length === 0) return state;
+          const byImportId = new Map(pairs.map((p) => [p.importId, p.remoteId]));
+          return {
+            customForms: state.customForms.map((c) =>
+              byImportId.has(c.importId) ? { ...c, remoteId: byImportId.get(c.importId)! } : c
+            ),
+          };
+        }),
     }),
     {
       name: 'picker-storage',

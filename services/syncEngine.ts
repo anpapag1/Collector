@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useEntriesStore, processPendingDeletions } from '../store/entriesStore';
-import { usePickerStore } from '../store/pickerStore';
+import { usePickerStore, pushFormToSupabase, CustomForm } from '../store/pickerStore';
 import { Entry, EntryData, FormConfig, PhotoItem } from '../types';
 import { validateFormConfig } from '../utils/schemaLoader';
 import { debugLog } from '../utils/debugLog';
@@ -441,8 +441,11 @@ async function downloadOnePhoto(photo: { id: string; path: string }): Promise<Ph
   return { id: photo.id, uri: dest };
 }
 
-// Symmetric to pickerStore.addCustomForm's push: brings down any forms
-// already in the account that this device hasn't imported yet.
+// Symmetric to pickerStore.addCustomForm's push: brings down any forms already
+// in the account that this device hasn't imported yet, AND reconciles forms
+// that are no longer ours — deleted on another device, OR reassigned to a
+// different owner via the admin dashboard (which directly updates
+// forms.user_id). Both look identical to us under RLS: no owned row exists.
 async function pullRemoteForms(userId: string): Promise<void> {
   const { data: rows, error } = await withTimeout(
     supabase.from('forms').select('id, form_id, version, schema').eq('user_id', userId),
@@ -455,60 +458,59 @@ async function pullRemoteForms(userId: string): Promise<void> {
     return;
   }
 
-  const local = usePickerStore.getState().customForms;
-  const localUserForms = local.filter((c) => c.userId === userId);
+  const picker = usePickerStore.getState();
+  const localUserForms = picker.customForms.filter((c) => c.userId === userId);
 
-  const serverKeys = new Set((rows ?? []).map((row) => `${row.form_id}@${row.version}`));
+  const rowByKey = new Map((rows ?? []).map((row) => [`${row.form_id}@${row.version}`, row]));
+  const serverKeys = new Set(rowByKey.keys());
   const localKeys = new Set(localUserForms.map((c) => `${c.config.formId}@${c.config.version}`));
+
+  // Backfill the server primary key onto any matched local form that lacks one
+  // (e.g. imported before remoteId tracking existed). Capturing the PK while
+  // the form is STILL ours is what lets a LATER ownership change be handled by
+  // id — see the classification of extraLocal below.
+  const backfill: { importId: string; remoteId: string }[] = [];
+  for (const c of localUserForms) {
+    const row = rowByKey.get(`${c.config.formId}@${c.config.version}`);
+    if (row && !c.remoteId) backfill.push({ importId: c.importId, remoteId: row.id });
+  }
+  if (backfill.length > 0) picker.setFormRemoteIds(backfill);
 
   const missing = (rows ?? []).filter((row) => !localKeys.has(`${row.form_id}@${row.version}`));
   const extraLocal = localUserForms.filter((c) => !serverKeys.has(`${c.config.formId}@${c.config.version}`));
 
-  // If a local form isn't on the server, it was either added offline and push failed,
-  // or it was synced and then deleted on another device.
-  // Locally-added forms have an importId starting with 'custom-'.
-  // These re-push attempts are awaited (not fire-and-forget) below, BEFORE
-  // removeRemoteDeletedForms runs — otherwise removeRemoteDeletedForms would
-  // see the stale (pre-push) serverKeys and treat every one of these
-  // just-re-pushed, locally-added forms as "deleted on another device",
-  // deleting them (and cascading into deleting all of that form's entries).
-  const pushResults = await Promise.allSettled(
-    extraLocal
-      .filter((c) => c.importId.startsWith('custom-'))
-      .map((c) =>
-        supabase
-          .from('forms')
-          .upsert({
-            user_id: userId,
-            form_id: c.config.formId,
-            form_title: c.config.formTitle,
-            version: c.config.version,
-            schema: c.config,
-          }, { onConflict: 'user_id,form_id,version' })
-          .then(({ error }) => {
-            if (error) throw error;
-            return c;
-          })
-      )
+  // A local form with no matching owned server row is one of two things:
+  //  - remoteId present  => it WAS on the server under us but no longer is
+  //    (deleted on another device, OR reassigned to a different owner — RLS now
+  //    hides that row). In BOTH cases it is no longer ours: drop it locally and
+  //    NEVER re-push. Re-pushing is exactly what duplicated the form — an
+  //    upsert on (user_id, form_id, version) finds no row for the original
+  //    owner and INSERTS a fresh duplicate under them.
+  //  - remoteId absent   => imported on this device and never reached the server
+  //    (offline import, or a push that failed). This is the ONLY case to push.
+  //
+  // NOTE: a form reassigned away before it ever recorded a remoteId (i.e.
+  // imported on an app version predating this tracking, AND reassigned before
+  // its next normal sync could backfill the PK) can still duplicate once. Every
+  // owned form backfills its remoteId on its next ordinary pull, closing that
+  // window going forward.
+  const neverSynced = extraLocal.filter((c) => !c.remoteId);
+
+  // Push genuine never-synced imports BEFORE the removal pass so their keys can
+  // be protected. pushFormToSupabase records the assigned remoteId on success.
+  await Promise.allSettled(
+    neverSynced.map((c) => pushFormToSupabase(c.importId, c.config, userId, null))
   );
 
-  for (const result of pushResults) {
-    if (result.status === 'rejected') {
-      console.warn('[sync] form offline-add push failed', result.reason);
-    }
-  }
-
-  // Forms this device just (re-)pushed (or any other extraLocal,
-  // locally-added-pending-push form) must never be treated as deletion
-  // candidates, regardless of whether the push succeeded — a failed push
-  // will simply be retried next pass, but it must not be deleted out from
-  // under the user in the meantime. Add their keys to the "safe" set passed
-  // to removeRemoteDeletedForms.
+  // Protect matched forms and the just-pushed never-synced ones. Everything
+  // else owned by us (the remoteId-bearing extraLocal forms = no longer ours)
+  // is removed locally by removeRemoteDeletedForms, which cascades local entry
+  // cleanup (deleteRemote:false — the new owner keeps the remote rows; the
+  // dashboard also reassigns those entries to the new owner).
   const safeKeys = new Set(serverKeys);
-  for (const c of extraLocal) {
+  for (const c of neverSynced) {
     safeKeys.add(`${c.config.formId}@${c.config.version}`);
   }
-
   usePickerStore.getState().removeRemoteDeletedForms(safeKeys, userId);
 
   if (missing.length === 0) return;
@@ -517,11 +519,13 @@ async function pullRemoteForms(userId: string): Promise<void> {
   // validated import), but another device, a manual DB edit, or future
   // schema drift could still land something malformed here — re-validate
   // before it's allowed into this device's picker rather than trusting it.
-  const valid: { importId: string; config: FormConfig; userId: string }[] = [];
+  const valid: CustomForm[] = [];
   for (const row of missing) {
     try {
       const config = validateFormConfig(row.schema);
-      valid.push({ importId: row.id, config, userId });
+      // Record the remote PK so this device can match/update the exact row and
+      // survive a future ownership change without re-pushing a duplicate.
+      valid.push({ importId: row.id, config, userId, remoteId: row.id });
     } catch (err) {
       console.warn('[sync] skipped invalid pulled form', row.form_id, err);
       Sentry.captureException(err);
