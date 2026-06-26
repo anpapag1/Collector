@@ -110,7 +110,7 @@ export default function SettingsScreen() {
             />
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Sign in</Text>
-              <Text style={styles.rowSub}>Sync your entries across devices</Text>
+              <Text style={styles.rowSub}>Sync your forms and entries across devices</Text>
             </View>
           </TouchableOpacity>
         )}

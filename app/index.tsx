@@ -639,9 +639,13 @@ export default function HomeScreen() {
               })
             ) : (
               <View style={styles.emptyForms}>
-                <MaterialIcons name="delete-forever" size={34} color={colors.text.muted} />
-                <Text style={styles.emptyFormsTitle}>No saved forms</Text>
-                <Text style={styles.emptyFormsHint}>Use device files to load a new form config.</Text>
+                <MaterialIcons name="post-add" size={34} color={colors.text.muted} />
+                <Text style={styles.emptyFormsTitle}>No forms yet</Text>
+                <Text style={styles.emptyFormsHint}>
+                  {session
+                    ? 'Create a form on the web app and it\'ll sync here, or import a JSON file from device.'
+                    : 'Sign in to sync forms created on the web app, or import a JSON file from device.'}
+                </Text>
               </View>
             )}
             <TouchableOpacity style={[styles.sheetItem, styles.sheetDivider]} onPress={browseFiles}>
