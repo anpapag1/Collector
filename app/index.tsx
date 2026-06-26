@@ -28,7 +28,7 @@ import { useSyncStore } from '../store/syncStore';
 import EntryCard from '../components/EntryCard';
 import Toast from '../components/Toast';
 import { FormConfig } from '../types';
-import { loadBundledConfig, loadFromPath } from '../utils/schemaLoader';
+import { loadFromPath } from '../utils/schemaLoader';
 import { getEntryDisplayNumbers } from '../utils/entryNumbering';
 import { requestSync } from '../services/syncEngine';
 import { AppColors, darkColors } from '../theme/colors';
@@ -38,12 +38,7 @@ import { useThemeStore } from '../store/themeStore';
 type FormPreset = {
   id: string;
   config: FormConfig;
-  custom?: boolean;
 };
-
-const INITIAL_PRESETS: FormPreset[] = [
-  { id: 'template', config: loadBundledConfig() },
-];
 
 const GLOBAL_SYNC_META: Record<
   'synced' | 'syncing' | 'pending' | 'error',
@@ -71,8 +66,6 @@ export default function HomeScreen() {
   const entries = useEntriesStore((s) => s.entries);
   const clearEntries = useEntriesStore((s) => s.clearEntries);
   const deleteEntry = useEntriesStore((s) => s.deleteEntry);
-  const hiddenPresetIds = usePickerStore((s) => s.hiddenPresetIds);
-  const hidePreset = usePickerStore((s) => s.hidePreset);
   const customForms = usePickerStore((s) => s.customForms);
   const addCustomForm = usePickerStore((s) => s.addCustomForm);
   const removeCustomForm = usePickerStore((s) => s.removeCustomForm);
@@ -110,18 +103,11 @@ export default function HomeScreen() {
         .map(({ importId, config }) => ({
           id: importId,
           config,
-          custom: true,
         })),
     [ownedCustomForms],
   );
   const malformedCustomFormCount = ownedCustomForms.length - customPresets.length;
-  const presets = useMemo(
-    () =>
-      [...INITIAL_PRESETS, ...customPresets].filter(
-        (preset) => !hiddenPresetIds.includes(preset.id),
-      ),
-    [customPresets, hiddenPresetIds],
-  );
+  const presets = customPresets;
   const formTitle = useMemo(() => schema?.formTitle ?? '—', [schema]);
   // Entries belong to whichever account claimed them (or to nobody yet, if
   // collected before signing in). Showing another already-claimed account's
@@ -274,11 +260,7 @@ export default function HomeScreen() {
           label: 'Delete',
           style: 'destructive',
           onPress: () => {
-            if (preset.custom) {
-              removeCustomForm(presetId);
-            } else {
-              hidePreset(presetId);
-            }
+            removeCustomForm(presetId);
             // Deleting a form also deletes everything collected under it —
             // otherwise its entries would be orphaned, with no form left to
             // view or export them from.
@@ -287,12 +269,9 @@ export default function HomeScreen() {
             // Read live store state instead of the closed-over `presets`/`activePresetId`
             // variables, which may be stale by the time this async alert callback fires.
             const pickerState = usePickerStore.getState();
-            const liveCustomPresets: FormPreset[] = pickerState.customForms
+            const liveRemaining = pickerState.customForms
               .filter(({ config }) => config?.formTitle && config?.fields)
-              .map(({ importId, config }) => ({ id: importId, config, custom: true }));
-            const liveRemaining = [...INITIAL_PRESETS, ...liveCustomPresets].filter(
-              (item) => !pickerState.hiddenPresetIds.includes(item.id) && item.id !== presetId,
-            );
+              .filter((item) => item.importId !== presetId);
 
             if (liveRemaining.length === 0) {
               useFormStore.getState().clearSchema();

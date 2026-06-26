@@ -15,7 +15,6 @@ import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import ScreenBubbles from '../components/ScreenBubbles';
 import ThemeToggle from '../components/ThemeToggle';
 import { useThemeStore } from '../store/themeStore';
-import { seedTestEntries } from '../utils/seedTestEntries';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -31,23 +30,6 @@ export default function SettingsScreen() {
   const clearLocalForms = usePickerStore((s) => s.clearLocalForms);
   const devModeEnabled = useDevModeStore((s) => s.enabled);
   const setDevModeEnabled = useDevModeStore((s) => s.setEnabled);
-
-  const handleSeedTestEntries = () => {
-    showDialog({
-      title: 'Add 100 test entries?',
-      message: 'This adds 100 sample entries (each with a placeholder photo) for the Erwtimatologio Simiou form, useful for stress-testing the list, sync, and export. They behave exactly like real entries.',
-      actions: [
-        { label: 'Cancel', style: 'cancel' },
-        {
-          label: 'Add entries',
-          onPress: async () => {
-            const count = await seedTestEntries();
-            showDialog({ title: 'Done', message: `${count} test entries added.`, actions: [{ label: 'OK' }] });
-          },
-        },
-      ],
-    });
-  };
 
   const handleSignOut = () => {
     if (entries.length === 0 && customForms.length === 0) {
@@ -148,7 +130,7 @@ export default function SettingsScreen() {
       {__DEV__ && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Developer</Text>
-          <View style={[styles.row, devModeEnabled && styles.rowGroupTop]}>
+          <View style={styles.row}>
             <MaterialIcons name="developer-mode" size={22} color={colors.text.secondary} />
             <View style={styles.rowBody}>
               <Text style={styles.rowTitle}>Developer mode</Text>
@@ -161,16 +143,6 @@ export default function SettingsScreen() {
               thumbColor={colors.background.white}
             />
           </View>
-
-          {devModeEnabled && (
-            <TouchableOpacity style={[styles.row, styles.rowGroupBottom]} onPress={handleSeedTestEntries}>
-              <MaterialIcons name="science" size={22} color={colors.text.secondary} />
-              <View style={styles.rowBody}>
-                <Text style={styles.rowTitle}>Add 100 test entries</Text>
-                <Text style={styles.rowSub}>Stress-test data for Erwtimatologio Simiou</Text>
-              </View>
-            </TouchableOpacity>
-          )}
         </View>
       )}
     </View>
@@ -221,16 +193,6 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 14,
-  },
-  rowGroupTop: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    borderBottomWidth: 0,
-  },
-  rowGroupBottom: {
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    marginTop: -1,
   },
   rowBody: {
     flex: 1,

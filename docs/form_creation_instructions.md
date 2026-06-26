@@ -1,6 +1,6 @@
 # Creating a Custom Form for Collector
 
-A form in Collector is a single JSON file describing a title, optional sections, and a list of fields. You can build one from scratch or copy [`assets/form-config.json`](assets/form-config.json) as a starting point.
+A form in Collector is a single JSON file describing a title, optional sections, and a list of fields. You can build one from scratch following the structure below.
 
 Once your file is ready, import it from the **Home** screen via the form picker's import option (document picker), or save/export an existing form the same way.
 
@@ -101,7 +101,7 @@ Then tag a field with `"sectionId": "sec-building"` to place it in that group.
 "showIf": { "fieldId": "category", "equals": ["Building", "Mixed use"] }
 ```
 
-This is typically combined with `sectionId` so an entire section only appears for a given category — see the building/public-space/parking examples in `assets/form-config.json`.
+This is typically combined with `sectionId` so an entire section only appears for a given category.
 
 ## Worked example
 

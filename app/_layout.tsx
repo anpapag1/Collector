@@ -13,7 +13,6 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import * as Sentry from '@sentry/react-native';
-import { loadBundledConfig } from '../utils/schemaLoader';
 import { useFormStore } from '../store/formStore';
 import { usePickerStore } from '../store/pickerStore';
 import { useEntriesStore } from '../store/entriesStore';
@@ -35,8 +34,6 @@ SplashScreen.preventAutoHideAsync().catch((e) => console.warn('preventAutoHideAs
 
 function RootLayout() {
   const hasInitialized = useFormStore((s) => s.hasInitialized);
-  const loadSchema = useFormStore((s) => s.loadSchema);
-  const setActivePresetId = usePickerStore((s) => s.setActivePresetId);
   const initAuth = useAuthStore((s) => s.init);
   const initSync = useSyncStore((s) => s.init);
   const themeMode = useThemeStore((s) => s.mode);
@@ -87,17 +84,11 @@ function RootLayout() {
   useEffect(() => {
     if (fontsLoaded && hasHydrated) {
       if (!hasInitialized) {
-        try {
-          loadSchema(loadBundledConfig());
-          setActivePresetId('template');
-        } catch (e) {
-          console.warn('Failed to load bundled config', e);
-          useFormStore.setState({ hasInitialized: true });
-        }
+        useFormStore.setState({ hasInitialized: true });
       }
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, hasHydrated, hasInitialized, loadSchema, setActivePresetId]);
+  }, [fontsLoaded, hasHydrated, hasInitialized]);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(themeMode === 'dark' ? '#050708' : '#F7FBFE')

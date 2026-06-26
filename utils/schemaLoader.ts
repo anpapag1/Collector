@@ -56,11 +56,6 @@ export function validateFormConfig(parsed: any): FormConfig {
   return parsed as FormConfig;
 }
 
-export function loadBundledConfig(): FormConfig {
-  const parsed = require('../assets/form-config.json');
-  return validateFormConfig(parsed);
-}
-
 export async function loadFromPath(uri: string): Promise<FormConfig> {
   const content = await new File(uri).text();
   const parsed = JSON.parse(content);

@@ -45,12 +45,8 @@ function deleteFormFromSupabase(config: FormConfig, userId: string) {
 }
 
 type PickerState = {
-  hiddenPresetIds: string[];
   customForms: CustomForm[];
   activePresetId: string | null;
-  hidePreset: (id: string) => void;
-  showPreset: (id: string) => void;
-  resetHiddenPresets: () => void;
   addCustomForm: (config: FormConfig, importId: string, userId?: string | null) => void;
   removeCustomForm: (importId: string) => void;
   setActivePresetId: (id: string | null) => void;
@@ -64,20 +60,8 @@ type PickerState = {
 export const usePickerStore = create<PickerState>()(
   persist(
     (set, get) => ({
-      hiddenPresetIds: [],
       customForms: [],
       activePresetId: null,
-      hidePreset: (id) =>
-        set((state) => ({
-          hiddenPresetIds: state.hiddenPresetIds.includes(id)
-            ? state.hiddenPresetIds
-            : [...state.hiddenPresetIds, id],
-        })),
-      showPreset: (id) =>
-        set((state) => ({
-          hiddenPresetIds: state.hiddenPresetIds.filter((presetId) => presetId !== id),
-        })),
-      resetHiddenPresets: () => set({ hiddenPresetIds: [] }),
       addCustomForm: (config, importId, userId) => {
         set((state) => ({
           customForms: [...state.customForms, { importId, config, userId: userId ?? null }],
@@ -196,7 +180,6 @@ export const usePickerStore = create<PickerState>()(
       name: 'picker-storage',
       storage: createJSONStorage(() => safeAsyncStorage),
       partialize: (state) => ({
-        hiddenPresetIds: state.hiddenPresetIds,
         customForms: state.customForms,
         activePresetId: state.activePresetId,
       }),

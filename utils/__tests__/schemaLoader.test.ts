@@ -1,4 +1,4 @@
-import { validateFormConfig, loadBundledConfig } from '../schemaLoader';
+import { validateFormConfig } from '../schemaLoader';
 
 function baseConfig(overrides: Record<string, any> = {}) {
   return {
@@ -172,14 +172,5 @@ describe('validateFormConfig', () => {
       ],
     });
     expect(() => validateFormConfig(config)).toThrow(/does not match any section id/);
-  });
-});
-
-describe('loadBundledConfig', () => {
-  it('succeeds without throwing on the real bundled form-config.json', () => {
-    expect(() => loadBundledConfig()).not.toThrow();
-    const config = loadBundledConfig();
-    expect(config.formId).toBeTruthy();
-    expect(Array.isArray(config.fields)).toBe(true);
   });
 });
