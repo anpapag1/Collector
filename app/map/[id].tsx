@@ -78,7 +78,12 @@ export default function MapScreen() {
     [entries, displayNumbers]
   );
 
-  const currentEntry = entries.find((e) => e.id === id);
+  // 'all' is the sentinel used by the "Open map" overview entry point
+  // (app/index.tsx) to mean "no single entry — show every pin." It is
+  // deliberately never a real entry id, so it must be excluded from the
+  // not-found check below.
+  const hasSpecificEntry = !!id && id !== 'all';
+  const currentEntry = hasSpecificEntry ? entries.find((e) => e.id === id) : undefined;
   const currentLocation = currentEntry ? entryLocation(currentEntry) : null;
   const fallbackLat = currentLocation?.lat ?? mapPoints[0]?.coordinate.latitude ?? 0;
   const fallbackLng = currentLocation?.lng ?? mapPoints[0]?.coordinate.longitude ?? 0;
@@ -90,8 +95,9 @@ export default function MapScreen() {
 
   // A deep-link id that doesn't resolve to an entry in the (cross-account /
   // active-form filtered) list must not silently fall back to a 0,0 region.
-  // Show an explicit not-available state with a back action instead.
-  if (id && !currentEntry) {
+  // Show an explicit not-available state with a back action instead. Does
+  // NOT apply to the 'all' overview sentinel (see hasSpecificEntry above).
+  if (hasSpecificEntry && !currentEntry) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.topBar}>
