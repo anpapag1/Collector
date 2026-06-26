@@ -92,6 +92,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
               onPress: () => {
                 migrate.discardUnclaimedEntries();
                 usePickerStore.getState().discardUnclaimedCustomForms();
+                require('./formStore').useFormStore.getState().resetDraft();
               },
             },
             {
