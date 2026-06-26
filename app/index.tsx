@@ -648,7 +648,17 @@ export default function HomeScreen() {
                 </Text>
               </View>
             )}
-            <TouchableOpacity style={[styles.sheetItem, styles.sheetDivider]} onPress={browseFiles}>
+            <TouchableOpacity
+              style={[styles.sheetItem, styles.sheetDivider]}
+              onPress={() => {
+                setSheet(null);
+                router.push('/form-builder');
+              }}
+            >
+              <MaterialIcons name="add-circle-outline" size={22} color={colors.brand.primary} />
+              <Text style={styles.sheetItemTitle}>Create new form…</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetItem} onPress={browseFiles}>
               <MaterialIcons name="folder-open" size={22} color={colors.text.secondary} />
               <Text style={styles.sheetItemTitle}>Browse device files…</Text>
             </TouchableOpacity>
