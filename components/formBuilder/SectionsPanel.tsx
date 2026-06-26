@@ -2,6 +2,7 @@ import React, { memo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { FormSection } from '../../types';
+import { generateSectionId } from '../../utils/formBuilderSerializer';
 import { AppColors } from '../../theme/colors';
 import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
@@ -25,8 +26,9 @@ function SectionsPanel({ sections, onChange }: Props) {
   };
 
   const addSection = () => {
-    const n = sections.length + 1;
-    onChange([...sections, { id: `section-${Date.now()}-${n}`, title: '' }]);
+    const existingIds = new Set(sections.map((s) => s.id));
+    const id = generateSectionId(`section-${sections.length + 1}`, existingIds);
+    onChange([...sections, { id, title: '' }]);
   };
 
   return (

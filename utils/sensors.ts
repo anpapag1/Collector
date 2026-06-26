@@ -20,6 +20,11 @@ async function lookupAddress(lat: number, lng: number): Promise<string | null> {
   }
 }
 
+// Accuracy (in metres) above which a captured fix is considered "poor" — the
+// capture still succeeds, but the UI surfaces a non-blocking warning so the
+// user knows the coordinate may be unreliable. Exported for GpsField.
+export const POOR_ACCURACY_THRESHOLD_M = 20;
+
 const CAPTURE_TIMEOUT_MS = 20000;
 const GOOD_ENOUGH_ACCURACY_M = 8;
 const SETTLE_WINDOW_MS = 6000;

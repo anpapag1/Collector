@@ -141,10 +141,18 @@ export const usePickerStore = create<PickerState>()(
           // A form deleted on another device is still gone from under its
           // entries here — same cascade as deleting it locally, so nothing
           // orphaned is left behind on this device either.
+          //
+          // C3: the OTHER device owns remote cleanup of its own entries, so
+          // this device must only drop its LOCAL copies — deleteRemote: false.
+          // Otherwise this cascade would delete the remote entry rows (data
+          // loss for the account).
+          // C4: scope the local removal to this user's entries (and the
+          // form's title), so we don't wipe other accounts'/other versions'
+          // entries that happen to share the title.
           setTimeout(() => {
             const { clearEntries } = require('./entriesStore').useEntriesStore.getState();
             for (const c of removed) {
-              clearEntries({ formTitle: c.config.formTitle });
+              clearEntries({ formTitle: c.config.formTitle, deleteRemote: false, userId });
             }
           }, 0);
 

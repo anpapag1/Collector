@@ -21,7 +21,7 @@ let queuedRerun = false;
 // the stale-syncing recovery picking up an entry whose original attempt is
 // merely slow, not actually dead, or runSync somehow re-entering despite the
 // isRunning guard), which would otherwise race markSyncing/markSynced/markSyncError.
-const inFlightEntryIds = new Set<string>();
+export const inFlightEntryIds = new Set<string>();
 
 // Single entry point every trigger (addEntry, sign-in, foreground, connectivity,
 // interval) calls. Coalesces concurrent calls into one pass instead of running
@@ -81,9 +81,14 @@ async function runSync(): Promise<void> {
       inFlightEntryIds.add(entry.id);
       markSyncing(entry.id);
       debugLog(`[sync] pushing entry ${entry.id} (status was ${entry.syncStatus})`);
+      // C1: capture the entry's updatedAt as of THIS push. If the user edits
+      // the entry mid-upload, updateEntry bumps updatedAt + sets 'pending';
+      // markSynced compares against this token and refuses to force the entry
+      // back to 'synced', so the edit isn't lost.
+      const pushedUpdatedAt = entry.updatedAt;
       try {
         const { remoteId, remoteUpdatedAt } = await syncOneEntry(entry, userId);
-        markSynced(entry.id, remoteId, remoteUpdatedAt);
+        markSynced(entry.id, remoteId, remoteUpdatedAt, pushedUpdatedAt);
         debugLog(`[sync] entry ${entry.id} synced ok -> remoteId ${remoteId}`);
       } catch (err) {
         const message = errorMessage(err);
@@ -161,7 +166,24 @@ async function syncOneEntry(
     }
   }
 
-  const remoteData = await uploadEntryPhotos(entry, userId);
+  // C6: fetch the existing remote row's data (if any) so uploadEntryPhotos can
+  // merge by photo id. After a partial photo DOWNLOAD, the local image field is
+  // missing the photos that failed to download; without this merge the next
+  // push would overwrite the complete remote photo array with the incomplete
+  // local one, losing those photos remotely. Preserving remote photo ids the
+  // local set no longer has keeps that from happening.
+  let existingRemoteData: Record<string, any> | null = null;
+  if (entry.remoteId) {
+    const { data: existing, error: existingError } = await withTimeout(
+      supabase.from('entries').select('data').eq('id', entry.remoteId).single(),
+      DB_QUERY_TIMEOUT_MS,
+      `Fetching remote photos for entry ${entry.id} timed out`
+    );
+    if (existingError) throw existingError;
+    existingRemoteData = (existing?.data as Record<string, any>) ?? null;
+  }
+
+  const remoteData = await uploadEntryPhotos(entry, userId, existingRemoteData);
 
   const { data, error } = await withTimeout(
     supabase
@@ -190,18 +212,40 @@ async function syncOneEntry(
 
 // Returns a copy of entry.data with each image field's local PhotoItem[]
 // replaced by uploaded storage paths. The local entry/data is never mutated.
-async function uploadEntryPhotos(entry: Entry, userId: string): Promise<Record<string, any>> {
+//
+// C6 invariant: an incomplete local photo set must never delete remote photos
+// the server still has. We merge by photo id — every locally-present photo is
+// (re-)uploaded, and any photo id present in the existing REMOTE data but
+// missing locally (e.g. it failed to download in a partial pull) is carried
+// forward by its stored {id, path} so it stays on the server.
+async function uploadEntryPhotos(
+  entry: Entry,
+  userId: string,
+  existingRemoteData: Record<string, any> | null = null
+): Promise<Record<string, any>> {
   const remoteData: Record<string, any> = { ...entry.data };
   const imageFields = (entry.fields ?? []).filter((f) => f.type === 'image');
 
   for (const field of imageFields) {
     const photos: PhotoItem[] = entry.data[field.id] ?? [];
-    if (!Array.isArray(photos) || photos.length === 0) continue;
+    const localPhotos = Array.isArray(photos) ? photos : [];
 
     const uploaded = await Promise.all(
-      photos.map((photo) => uploadOnePhoto(entry.id, photo, userId))
+      localPhotos.map((photo) => uploadOnePhoto(entry.id, photo, userId))
     );
-    remoteData[field.id] = uploaded;
+
+    // Carry forward any remote photo whose id isn't in the local set — those
+    // are photos the server has that this device never downloaded (partial
+    // pull). Dropping them would lose them remotely.
+    const localIds = new Set(uploaded.map((p) => p.id));
+    const remotePhotos: { id: string; path: string }[] = Array.isArray(existingRemoteData?.[field.id])
+      ? existingRemoteData![field.id]
+      : [];
+    const preserved = remotePhotos.filter(
+      (p) => p && typeof p.id === 'string' && typeof p.path === 'string' && !localIds.has(p.id)
+    );
+
+    remoteData[field.id] = [...uploaded, ...preserved];
   }
 
   return remoteData;
@@ -242,12 +286,16 @@ async function uploadOnePhoto(
 // are deliberately left alone here — see syncOneEntry's conflict check for
 // why overwriting them on pull would silently destroy the user's own edit.
 async function pullRemoteEntries(userId: string): Promise<void> {
-  const { entries, pendingDeletions } = useEntriesStore.getState();
+  const { entries, pendingDeletions, pendingLocalIdDeletions } = useEntriesStore.getState();
   const localById = new Map(entries.map((e) => [e.id, e]));
   // Defense in depth: processPendingDeletions already runs before this in
   // runSync, but skip any row whose delete is still pending retry anyway —
   // downloading it back would "resurrect" an entry the user deleted.
   const pendingDeletionIds = new Set(pendingDeletions.map((p) => p.remoteId));
+  // C2: same defense for entries tombstoned by local_id (deleted mid-first-sync,
+  // before they had a remoteId). Skip any remote row whose local_id is still
+  // pending deletion so it isn't re-downloaded before its delete lands.
+  const pendingLocalIdSet = new Set(pendingLocalIdDeletions);
 
   const { data: rows, error } = await withTimeout(
     supabase
@@ -267,6 +315,7 @@ async function pullRemoteEntries(userId: string): Promise<void> {
   const stale: typeof rows = [];
   for (const row of rows ?? []) {
     if (pendingDeletionIds.has(row.id)) continue;
+    if (pendingLocalIdSet.has(row.local_id)) continue;
     const local = localById.get(row.local_id);
     if (!local) {
       missing.push(row);

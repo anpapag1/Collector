@@ -264,7 +264,9 @@ export default function HomeScreen() {
             // Deleting a form also deletes everything collected under it —
             // otherwise its entries would be orphaned, with no form left to
             // view or export them from.
-            clearEntries({ formTitle: preset.config.formTitle });
+            // C4: scope to the signed-in user so a shared title doesn't wipe
+            // other accounts'/other versions' entries.
+            clearEntries({ formTitle: preset.config.formTitle, userId: currentUserId });
 
             // Read live store state instead of the closed-over `presets`/`activePresetId`
             // variables, which may be stale by the time this async alert callback fires.
@@ -357,7 +359,9 @@ export default function HomeScreen() {
           label: 'Delete all',
           style: 'destructive',
           onPress: () => {
-            clearEntries({ formTitle: schema?.formTitle });
+            // C4: scope to the signed-in user so we don't delete other
+            // accounts'/other form-versions' entries sharing this title.
+            clearEntries({ formTitle: schema?.formTitle, userId: currentUserId });
             showSnack('All entries deleted');
           },
         },

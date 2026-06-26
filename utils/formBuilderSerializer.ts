@@ -124,6 +124,19 @@ export function validateFormConfigForSave(state: BuilderState): {
       errors.push({ scope: 'field', id: field.id || null, message: msg });
     }
 
+    if (field.showIf) {
+      const eq = field.showIf.equals;
+      const isEmptyEquals = Array.isArray(eq)
+        ? eq.length === 0 || eq.every((v) => String(v).trim() === '')
+        : String(eq ?? '').trim() === '';
+      if (isEmptyEquals) {
+        errors.push({
+          scope: 'field',
+          id: field.id || null,
+          message: `"${field.label || 'This field'}"'s conditional rule needs a value to match.`,
+        });
+      }
+    }
     if (field.showIf && !seenIds.has(field.showIf.fieldId)) {
       errors.push({
         scope: 'field',

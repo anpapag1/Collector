@@ -14,15 +14,18 @@ export default function DialogHost() {
   const colors = useAppColors();
   const styles = useThemedStyles(createStyles);
 
-  if (!options) return null;
-
   const handlePress = (action: DialogAction) => {
     hide();
     action.onPress?.();
   };
 
+  // Keep the Modal mounted and drive its `visible` prop off the store flag so
+  // the fade-out animation can play on hide (early-returning null when
+  // `current` is null would kill the animation). When hidden there's nothing
+  // to render inside.
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={hide}>
+      {options ? (
       <View style={styles.scrim}>
         <View style={styles.card}>
           <Text style={styles.title}>{options.title}</Text>
@@ -53,6 +56,7 @@ export default function DialogHost() {
           </View>
         </View>
       </View>
+      ) : null}
     </Modal>
   );
 }

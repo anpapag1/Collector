@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import React, { memo, useEffect, useRef } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GpsStatus } from '../../store/formStore';
+import { POOR_ACCURACY_THRESHOLD_M } from '../../utils/sensors';
 import { AppColors } from '../../theme/colors';
 import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 
@@ -36,6 +37,12 @@ function GpsField({ status, coords, accuracy, address, onCapture, error }: Props
 
   const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
+  // DynamicForm passes accuracy as a formatted string like "±5.0 m". Parse the
+  // numeric value back out so we can flag a low-accuracy fix. The warning is
+  // non-blocking — the user can keep the fix or tap Redo.
+  const accuracyMeters = accuracy ? parseFloat(accuracy.replace(/[^0-9.]/g, '')) : NaN;
+  const lowAccuracy = Number.isFinite(accuracyMeters) && accuracyMeters > POOR_ACCURACY_THRESHOLD_M;
+
   return (
     <View style={[styles.banner, error && styles.bannerError]}>
       {status === 'capturing' && (
@@ -57,6 +64,11 @@ function GpsField({ status, coords, accuracy, address, onCapture, error }: Props
             <Text style={[styles.title, { color: colors.text.brandDark }]}>Location captured</Text>
             {address ? <Text style={styles.address}>{address}</Text> : null}
             <Text style={styles.sub}>{coords} · {accuracy}</Text>
+            {lowAccuracy && (
+              <Text style={styles.warnText}>
+                Low accuracy (±{Math.round(accuracyMeters)}m) — move to open sky and Redo
+              </Text>
+            )}
           </View>
           <TouchableOpacity onPress={onCapture} style={styles.redoBtn}>
             <Text style={styles.redoBtnText}>Redo</Text>
@@ -164,6 +176,12 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 12,
     color: colors.text.danger,
     marginTop: 8,
+  },
+  warnText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.text.warning,
+    marginTop: 3,
   },
 });
 

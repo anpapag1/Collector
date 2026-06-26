@@ -40,19 +40,23 @@ export default function UpdatePasswordScreen() {
     // No recovery session means the deep link flow didn't complete (expired
     // link, malformed link, or the screen was reached some other way) — send
     // the user back to login rather than letting them sit on a dead form.
-    // Two guards against false positives: wait for `initialized` (until the
+    // Guards against false positives: wait for `initialized` (until the
     // initial getSession()/listener setup resolves, `session` reads null
     // even for a legitimate recovery session that's about to land), and a
-    // short grace delay on top of that — if Expo Router's own deep-link
-    // handling lands us on this screen slightly before authStore's Linking
-    // listener finishes applying the recovery session, give it a moment to
-    // catch up rather than bouncing the user immediately.
+    // generous grace window on top of that. A cold-start recovery deep link
+    // whose setSession() resolves can take a while; a short fixed timeout
+    // could bounce a perfectly valid recovery session to login. This effect
+    // re-runs whenever `session` changes, and the cleanup below clears any
+    // pending timer — so the moment the recovery session lands, the redirect
+    // is aborted and the early `return` on the next run keeps it aborted.
+    // Only the genuinely sessionless case (expired/malformed link) survives
+    // the full window and redirects.
     if (!initialized || session) return;
     const timer = setTimeout(() => {
       if (!useAuthStore.getState().session) {
         router.replace('/(auth)/login');
       }
-    }, 800);
+    }, 3000);
     return () => clearTimeout(timer);
   }, [initialized, session]);
 

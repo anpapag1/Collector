@@ -15,7 +15,9 @@ type Props = {
 function RatingField({ field, value, onChange, error }: Props) {
   const colors = useAppColors();
   const styles = useThemedStyles(createStyles);
-  const max = field.max ?? 5;
+  // Default to 5 when max is undefined/null or non-positive so we never render
+  // zero stars (the serializer omits max when cleared).
+  const max = typeof field.max === 'number' && field.max > 0 ? field.max : 5;
 
   return (
     <View>

@@ -27,8 +27,9 @@ export const useDialogStore = create<DialogState>()((set, get) => ({
   show: (options) => {
     const { visible, queue } = get();
     if (!visible) {
-      // Nothing showing right now — display this one immediately.
-      set({ visible: true, current: options, queue: [] });
+      // Nothing showing right now — display this one immediately. Preserve
+      // any existing queue (normally empty) rather than clobbering it.
+      set({ visible: true, current: options });
     } else {
       // Something's already up — queue this one for after.
       set({ queue: [...queue, options] });

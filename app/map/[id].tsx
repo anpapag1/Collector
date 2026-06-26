@@ -88,6 +88,28 @@ export default function MapScreen() {
     [mapPoints, fallbackLat, fallbackLng]
   );
 
+  // A deep-link id that doesn't resolve to an entry in the (cross-account /
+  // active-form filtered) list must not silently fall back to a 0,0 region.
+  // Show an explicit not-available state with a back action instead.
+  if (id && !currentEntry) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+            <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <View style={styles.topBarBody}>
+            <Text style={styles.screenTitle}>Locations</Text>
+          </View>
+        </View>
+        <View style={styles.notFoundState}>
+          <MaterialIcons name="location-off" size={40} color={colors.text.muted} />
+          <Text style={styles.notFoundText}>Entry not available</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
@@ -205,6 +227,18 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 12,
     color: colors.text.secondary,
     marginTop: 1,
+  },
+
+  notFoundState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 36,
+  },
+  notFoundText: {
+    fontSize: 15,
+    color: colors.text.secondary,
   },
 
   map: { flex: 1 },

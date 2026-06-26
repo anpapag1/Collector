@@ -27,7 +27,7 @@ type AuthState = {
   init: () => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
-  signInWithGoogle: () => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null; cancelled?: boolean }>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -197,7 +197,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       if (result.type !== 'success' || !result.url) {
         set({ loading: false });
-        return { error: result.type === 'cancel' ? null : 'Google sign-in did not complete' };
+        if (result.type === 'cancel') {
+          return { error: null, cancelled: true };
+        }
+        return { error: 'Google sign-in did not complete' };
       }
 
       const url = new URL(result.url.replace('#', '?'));
@@ -254,12 +257,27 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   signOut: async () => {
     set({ loading: true, error: null });
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.warn('[auth] signOut failed', error);
-      set({ error: error.message });
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.warn('[auth] signOut failed', error);
+        set({ loading: false, error: error.message });
+        return;
+      }
+      // Clear per-device local caches so a leftover dataset from the previous
+      // user can't leak to the next account on a shared device (the SIGNED_IN
+      // claim dialog would otherwise offer to upload it). These clear local
+      // only — anything synced remains safe in the cloud. Lazy require to
+      // avoid the module-load cycles this file deliberately avoids.
+      require('./entriesStore').useEntriesStore.getState().clearLocalOnly();
+      require('./pickerStore').usePickerStore.getState().clearLocalForms();
+      require('./formStore').useFormStore.getState().clearSchema();
+      set({ loading: false });
+    } catch (e: any) {
+      const message = e?.message ?? 'Sign-out failed';
+      console.warn('[auth] signOut failed', e);
+      set({ loading: false, error: message });
     }
-    set({ loading: false });
   },
 
   clearError: () => set({ error: null }),

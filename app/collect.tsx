@@ -168,10 +168,14 @@ export default function CollectScreen() {
       return;
     }
     try {
+      // TODO: True dimension downscaling (e.g. cap longest side at 1600px)
+      // needs expo-image-manipulator, which is not a dependency. Until then we
+      // lower the encode quality to keep stored originals smaller. quality only
+      // re-encodes — it does not reduce pixel dimensions.
       const result =
         source === 'camera'
-          ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
-          : await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
+          ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
+          : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
       if (!result.canceled && result.assets[0]) {
         const id = `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const picked = new File(result.assets[0].uri);

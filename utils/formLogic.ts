@@ -16,11 +16,17 @@ export function isFieldVisible(field: FieldDef, draft: EntryData): boolean {
   const expected = field.showIf.equals;
   const expectedList = Array.isArray(expected) ? expected : [expected];
 
+  // Type-tolerant compare: the builder always writes `equals` as a string, but
+  // the trigger's draft value can be a boolean or number. Coerce both sides to
+  // strings so e.g. boolean `true` matches `'true'` and number `5` matches `'5'`,
+  // while string-vs-string (select) comparisons still work as before.
+  const matches = (a: unknown) => expectedList.some((e) => String(a) === String(e));
+
   if (Array.isArray(target)) {
-    return target.some((t) => expectedList.includes(isOtherValue(t) ? t.value : t));
+    return target.some((t) => matches(isOtherValue(t) ? t.value : t));
   }
   const actual = isOtherValue(target) ? target.value : target;
-  return expectedList.includes(actual);
+  return matches(actual);
 }
 
 export function isFieldFilled(field: FieldDef, value: any): boolean {

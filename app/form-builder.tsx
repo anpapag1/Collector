@@ -85,7 +85,28 @@ export default function FormBuilderScreen() {
   };
 
   const removeField = (index: number) => {
-    setState((s) => ({ ...s, fields: s.fields.filter((_, i) => i !== index) }));
+    setState((s) => {
+      const removedId = s.fields[index]?.id;
+      const fields = s.fields
+        .filter((_, i) => i !== index)
+        // Scrub any other field's conditional rule that pointed at the deleted
+        // field so no dangling showIf reference is left behind.
+        .map((f) => (removedId && f.showIf?.fieldId === removedId ? { ...f, showIf: undefined } : f));
+      return { ...s, fields };
+    });
+  };
+
+  // When sections change (e.g. one is deleted in SectionsPanel), clear the
+  // sectionId of any field whose section no longer exists so we never ship a
+  // dangling reference.
+  const handleSectionsChange = (sections: typeof state.sections) => {
+    setState((s) => {
+      const sectionIds = new Set(sections.map((sec) => sec.id));
+      const fields = s.fields.map((f) =>
+        f.sectionId && !sectionIds.has(f.sectionId) ? { ...f, sectionId: undefined } : f,
+      );
+      return { ...s, sections, fields };
+    });
   };
 
   const moveField = (index: number, dir: -1 | 1) => {
@@ -113,14 +134,33 @@ export default function FormBuilderScreen() {
   // Auto-assign an id from the label on first edit, mirroring the web
   // builder's behavior, so users never have to hand-type a slug.
   const handleFieldChange = (index: number, updated: FieldDef) => {
-    let next = updated;
-    if (!next.id || next.id.startsWith('field-')) {
-      const existingIds = new Set(state.fields.filter((_, i) => i !== index).map((f) => f.id));
-      if (next.label.trim()) {
-        next = { ...next, id: generateFieldId(next.label, existingIds) };
+    setState((s) => {
+      let next = updated;
+      const oldId = s.fields[index]?.id;
+      let renamedFrom: string | undefined;
+      // Only auto-generate an id while it's still the placeholder (`field-…`)
+      // or empty — a field that already has a stable, user-derived id keeps it.
+      if (!next.id || next.id.startsWith('field-')) {
+        const existingIds = new Set(s.fields.filter((_, i) => i !== index).map((f) => f.id));
+        if (next.label.trim()) {
+          const newId = generateFieldId(next.label, existingIds);
+          if (newId !== oldId) {
+            renamedFrom = oldId;
+            next = { ...next, id: newId };
+          }
+        }
       }
-    }
-    updateField(index, next);
+      const fields = s.fields.map((f, i) => {
+        if (i === index) return next;
+        // Cascade the rename: rewrite any other field's showIf reference that
+        // pointed at the old id so a label edit never dangles a reference.
+        if (renamedFrom && f.showIf?.fieldId === renamedFrom) {
+          return { ...f, showIf: { ...f.showIf, fieldId: next.id } };
+        }
+        return f;
+      });
+      return { ...s, fields };
+    });
   };
 
   const handleFormIdBlur = () => {
@@ -318,7 +358,7 @@ export default function FormBuilderScreen() {
             <View style={styles.panelBody}>
               <SectionsPanel
                 sections={state.sections}
-                onChange={(sections) => setState((s) => ({ ...s, sections }))}
+                onChange={handleSectionsChange}
               />
             </View>
           )}

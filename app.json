@@ -35,7 +35,20 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-web-browser",
-      "@sentry/react-native/expo"
+      "@sentry/react-native/expo",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Collector uses your location to tag entries with GPS coordinates."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Collector needs photo access to attach images to entries.",
+          "cameraPermission": "Collector needs camera access to capture photos for entries."
+        }
+      ]
     ],
     "extra": {
       "router": {},

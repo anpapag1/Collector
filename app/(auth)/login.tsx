@@ -77,11 +77,14 @@ export default function LoginScreen() {
 
   const handleGoogleSignIn = async () => {
     setError(null);
-    const { error: googleError } = await signInWithGoogle();
+    const { error: googleError, cancelled } = await signInWithGoogle();
     if (googleError) {
       setError(googleError);
       return;
     }
+    // User dismissed the Google sheet without authenticating — stay on login
+    // rather than navigating the still-anonymous user away.
+    if (cancelled) return;
 
     goBackHome();
   };
