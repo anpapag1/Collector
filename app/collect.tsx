@@ -180,7 +180,7 @@ export default function CollectScreen() {
         const id = `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const picked = new File(result.assets[0].uri);
         const dest = new File(Paths.document, `${id}.jpg`);
-        picked.copy(dest);
+        picked.copySync(dest);
         const newPhoto: PhotoItem = { id, uri: dest.uri };
         setField(imageFieldId, [...(draft[imageFieldId] ?? []), newPhoto]);
       }

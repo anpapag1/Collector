@@ -194,12 +194,6 @@ export const usePickerStore = create<PickerState>()(
               ? null
               : state.activePresetId;
 
-          if (newActivePresetId === null && state.activePresetId !== null) {
-            setTimeout(() => {
-              require('./formStore').useFormStore.getState().clearSchema();
-            }, 0);
-          }
-
           // A form deleted on another device is still gone from under its
           // entries here — same cascade as deleting it locally, so nothing
           // orphaned is left behind on this device either.

@@ -27,8 +27,16 @@ export const useSyncStore = create<SyncRuntimeState>()((set) => ({
       if (wasOffline && isOnline) requestSync();
     });
 
-    AppState.addEventListener('change', (state) => {
-      if (state === 'active') requestSync();
+    let backgroundedAt = 0;
+    const MIN_BACKGROUND_SYNC_MS = 45_000;
+    AppState.addEventListener('change', (appState) => {
+      if (appState === 'background') {
+        backgroundedAt = Date.now();
+      } else if (appState === 'active') {
+        if (Date.now() - backgroundedAt >= MIN_BACKGROUND_SYNC_MS) {
+          requestSync();
+        }
+      }
     });
 
     useAuthStore.subscribe((s, prev) => {
