@@ -18,12 +18,14 @@ import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import {
   buildAndExport,
   buildCsvExport,
+  buildXlsxExport,
   csvExportFilename,
   exportFilename,
+  xlsxExportFilename,
 } from '../utils/exporter';
 
 type Phase = 'summary' | 'building' | 'done';
-type ExportKind = 'zip' | 'csv';
+type ExportKind = 'zip' | 'csv' | 'xlsx';
 
 export default function ExportScreen() {
   const colors = useAppColors();
@@ -51,7 +53,7 @@ export default function ExportScreen() {
   );
 
   const [phase, setPhase] = useState<Phase>('summary');
-  const [exportKind, setExportKind] = useState<ExportKind>('zip');
+  const [exportKind, setExportKind] = useState<ExportKind>('xlsx');
   const [formatMenuOpen, setFormatMenuOpen] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -72,9 +74,10 @@ export default function ExportScreen() {
       }, 0),
     [entries],
   );
-  const zipFilename = schema ? exportFilename(schema.formId) : 'export.zip';
-  const csvFilename = schema ? csvExportFilename(schema.formId) : 'export.csv';
-  const activeFilename = exportKind === 'csv' ? csvFilename : zipFilename;
+  const zipFilename  = schema ? exportFilename(schema.formId)     : 'export.zip';
+  const csvFilename  = schema ? csvExportFilename(schema.formId)  : 'export.csv';
+  const xlsxFilename = schema ? xlsxExportFilename(schema.formId) : 'export.xlsx';
+  const activeFilename = exportKind === 'csv' ? csvFilename : exportKind === 'xlsx' ? xlsxFilename : zipFilename;
 
   useEffect(() => {
     if (phase === 'building') {
@@ -112,6 +115,16 @@ export default function ExportScreen() {
         await Sharing.shareAsync(csvPath, {
           mimeType: 'text/csv',
           dialogTitle: 'Share CSV export',
+        });
+      } else if (exportKind === 'xlsx') {
+        const { path: xlsxPath, skippedPhotos } = await buildXlsxExport(entries, schema, (pct) => animateTo(pct));
+        setPhase('done');
+        if (skippedPhotos > 0) {
+          setError(`${skippedPhotos} photo${skippedPhotos === 1 ? '' : 's'} could not be embedded and were skipped.`);
+        }
+        await Sharing.shareAsync(xlsxPath, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Share Excel export',
         });
       } else {
         const { path: zipPath, skippedPhotos } = await buildAndExport(entries, schema, (pct) =>
@@ -169,10 +182,10 @@ export default function ExportScreen() {
 
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <MaterialIcons name="folder-zip" size={26} color={colors.brand.primary} />
+                <MaterialIcons name={exportKind === 'xlsx' ? 'table-chart' : exportKind === 'csv' ? 'table-chart' : 'folder-zip'} size={26} color={colors.brand.primary} />
                 <View>
                   <Text style={styles.cardHeaderTitle}>Ready to export</Text>
-                  <Text style={styles.cardHeaderSub}>Choose ZIP with photos or CSV for Excel</Text>
+                  <Text style={styles.cardHeaderSub}>Choose a format to download</Text>
                 </View>
               </View>
 
@@ -195,12 +208,12 @@ export default function ExportScreen() {
                   activeOpacity={0.78}
                 >
                   <MaterialIcons
-                    name={exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
+                    name={exportKind === 'xlsx' ? 'grid-on' : exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
                     size={18}
                     color={colors.brand.primary}
                   />
                   <Text style={styles.formatSelectText}>
-                    {exportKind === 'csv' ? 'CSV for Excel' : 'JSON + images'}
+                    {exportKind === 'xlsx' ? 'Excel with photos' : exportKind === 'csv' ? 'CSV for Excel' : 'ZIP + images'}
                   </Text>
                   <MaterialIcons
                     name={formatMenuOpen ? 'expand-less' : 'expand-more'}
@@ -213,8 +226,9 @@ export default function ExportScreen() {
               {formatMenuOpen && (
                 <View style={styles.formatMenu}>
                   {[
-                    { kind: 'zip' as const, icon: 'folder-zip' as const, label: 'ZIP + images' },
-                    { kind: 'csv' as const, icon: 'table-chart' as const, label: 'CSV for Excel' },
+                    { kind: 'xlsx' as const, icon: 'grid-on' as const,      label: 'Excel with photos (.xlsx)', sub: 'Spreadsheet with embedded images' },
+                    { kind: 'csv'  as const, icon: 'table-chart' as const,   label: 'CSV for Excel (.csv)',      sub: 'Spreadsheet, no photos' },
+                    { kind: 'zip'  as const, icon: 'folder-zip' as const,    label: 'ZIP + images (.zip)',        sub: 'JSON data and original photos' },
                   ].map((option) => (
                     <TouchableOpacity
                       key={option.kind}
@@ -228,7 +242,10 @@ export default function ExportScreen() {
                       }}
                     >
                       <MaterialIcons name={option.icon} size={18} color={colors.brand.primary} />
-                      <Text style={styles.formatOptionText}>{option.label}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formatOptionText}>{option.label}</Text>
+                        <Text style={styles.formatOptionSub}>{option.sub}</Text>
+                      </View>
                       {exportKind === option.kind && (
                         <MaterialIcons name="check" size={18} color={colors.brand.primary} />
                       )}
@@ -238,18 +255,20 @@ export default function ExportScreen() {
               )}
 
               <Text style={styles.formatHint}>
-                CSV opens in Excel but does not include photo files. Use ZIP if you need images.
+                {exportKind === 'xlsx'
+                  ? 'Excel file with photos embedded directly in the spreadsheet cells.'
+                  : exportKind === 'csv'
+                  ? 'CSV opens in Excel but does not include photo files.'
+                  : 'ZIP contains the full JSON data plus all original photo files.'}
               </Text>
             </View>
 
             <View style={styles.infoBox}>
               <MaterialIcons name="info" size={20} color={colors.text.secondary} />
               <Text style={styles.infoText}>
-                ZIP file:{' '}
-                <Text style={styles.infoMono}>{zipFilename}</Text>
-                {'\n'}CSV file:{' '}
-                <Text style={styles.infoMono}>{csvFilename}</Text>
-                {'\n'}The Android share sheet opens when the file is built.
+                {exportKind === 'xlsx' ? 'Excel file: ' : exportKind === 'csv' ? 'CSV file: ' : 'ZIP file: '}
+                <Text style={styles.infoMono}>{activeFilename}</Text>
+                {'\n'}The share sheet opens when the file is ready.
               </Text>
             </View>
           </>
@@ -263,13 +282,13 @@ export default function ExportScreen() {
                 style={[styles.spinnerRing, { transform: [{ rotate: spin }] }]}
               />
               <MaterialIcons
-                name={exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
+                name={exportKind === 'xlsx' ? 'grid-on' : exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
                 size={34}
                 color={colors.brand.primary}
                 style={styles.spinnerIcon}
               />
             </View>
-            <Text style={styles.buildingTitle}>{exportKind === 'csv' ? 'Building CSV...' : 'Building ZIP...'}</Text>
+            <Text style={styles.buildingTitle}>{exportKind === 'xlsx' ? 'Building Excel...' : exportKind === 'csv' ? 'Building CSV...' : 'Building ZIP...'}</Text>
             <Text style={styles.buildingFilename}>{activeFilename}</Text>
             <View style={styles.progressTrack}>
               <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
@@ -289,16 +308,18 @@ export default function ExportScreen() {
             disabled={entries.length === 0}
           >
             <MaterialIcons
-              name={exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
+              name={exportKind === 'xlsx' ? 'grid-on' : exportKind === 'csv' ? 'table-chart' : 'folder-zip'}
               size={22}
               color={colors.text.inverse}
             />
             <Text style={styles.buildBtnText}>
               {entries.length === 0
                 ? 'No entries to export'
-                : exportKind === 'csv'
-                  ? 'Export CSV'
-                  : 'Export ZIP'}
+                : exportKind === 'xlsx'
+                  ? 'Export Excel (.xlsx)'
+                  : exportKind === 'csv'
+                    ? 'Export CSV'
+                    : 'Export ZIP'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -428,10 +449,14 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     backgroundColor: colors.background.soft,
   },
   formatOptionText: {
-    flex: 1,
     fontSize: 14,
     fontWeight: '500',
     color: colors.text.primary,
+  },
+  formatOptionSub: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    marginTop: 1,
   },
   formatHint: {
     paddingHorizontal: 18,

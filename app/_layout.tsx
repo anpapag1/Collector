@@ -19,7 +19,9 @@ import { useEntriesStore } from '../store/entriesStore';
 import { useAuthStore } from '../store/authStore';
 import { useSyncStore } from '../store/syncStore';
 import { useThemeStore } from '../store/themeStore';
+import { useOnboardingStore } from '../store/onboardingStore';
 import DialogHost from '../components/DialogHost';
+import OnboardingModal from '../components/OnboardingModal';
 
 const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
 
@@ -53,7 +55,8 @@ function RootLayout() {
     useFormStore.persist.hasHydrated() &&
       useEntriesStore.persist.hasHydrated() &&
       usePickerStore.persist.hasHydrated() &&
-      useThemeStore.persist.hasHydrated()
+      useThemeStore.persist.hasHydrated() &&
+      useOnboardingStore.persist.hasHydrated()
   );
 
   useEffect(() => {
@@ -63,7 +66,8 @@ function RootLayout() {
         useFormStore.persist.hasHydrated() &&
         useEntriesStore.persist.hasHydrated() &&
         usePickerStore.persist.hasHydrated() &&
-        useThemeStore.persist.hasHydrated()
+        useThemeStore.persist.hasHydrated() &&
+        useOnboardingStore.persist.hasHydrated()
       ) {
         setHasHydrated(true);
       }
@@ -72,12 +76,14 @@ function RootLayout() {
     const unsubEntries = useEntriesStore.persist.onFinishHydration(checkAllHydrated);
     const unsubPicker = usePickerStore.persist.onFinishHydration(checkAllHydrated);
     const unsubTheme = useThemeStore.persist.onFinishHydration(checkAllHydrated);
+    const unsubOnboarding = useOnboardingStore.persist.onFinishHydration(checkAllHydrated);
     checkAllHydrated();
     return () => {
       unsubForm();
       unsubEntries();
       unsubPicker();
       unsubTheme();
+      unsubOnboarding();
     };
   }, [hasHydrated]);
 
@@ -110,6 +116,7 @@ function RootLayout() {
           }}
         />
         <DialogHost />
+        <OnboardingModal />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

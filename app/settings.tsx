@@ -15,6 +15,7 @@ import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import ScreenBubbles from '../components/ScreenBubbles';
 import ThemeToggle from '../components/ThemeToggle';
 import { useThemeStore } from '../store/themeStore';
+import { useOnboardingStore } from '../store/onboardingStore';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -30,6 +31,7 @@ export default function SettingsScreen() {
   const clearLocalForms = usePickerStore((s) => s.clearLocalForms);
   const devModeEnabled = useDevModeStore((s) => s.enabled);
   const setDevModeEnabled = useDevModeStore((s) => s.setEnabled);
+  const resetOnboarding = useOnboardingStore((s) => s.resetOnboarding);
 
   const handleSignOut = () => {
     if (entries.length === 0 && customForms.length === 0) {
@@ -118,13 +120,21 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>About</Text>
-        <View style={styles.row}>
+        <View style={[styles.row, styles.rowFirst]}>
           <MaterialIcons name="info-outline" size={22} color={colors.text.secondary} />
           <View style={styles.rowBody}>
             <Text style={styles.rowTitle}>{Constants.expoConfig?.name ?? 'Collector'}</Text>
             <Text style={styles.rowSub}>Version {Constants.expoConfig?.version ?? '—'}</Text>
           </View>
         </View>
+        <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={resetOnboarding}>
+          <MaterialIcons name="school" size={22} color={colors.text.secondary} />
+          <View style={styles.rowBody}>
+            <Text style={styles.rowTitle}>App Tour</Text>
+            <Text style={styles.rowSub}>Replay the getting-started guide</Text>
+          </View>
+          <MaterialIcons name="chevron-right" size={20} color={colors.text.muted} />
+        </TouchableOpacity>
       </View>
 
       {__DEV__ && (
@@ -193,6 +203,16 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 14,
+  },
+  rowFirst: {
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    borderBottomWidth: 0,
+  },
+  rowLast: {
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    marginTop: 1,
   },
   rowBody: {
     flex: 1,
