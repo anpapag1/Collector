@@ -16,6 +16,7 @@ type Props = {
   expanded: boolean;
   onToggleExpand: () => void;
   onChange: (updated: FieldDef) => void;
+  onLabelBlur: () => void;
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -31,6 +32,7 @@ function FieldEditorRow({
   expanded,
   onToggleExpand,
   onChange,
+  onLabelBlur,
   onRemove,
   onMoveUp,
   onMoveDown,
@@ -107,6 +109,7 @@ function FieldEditorRow({
               style={styles.input}
               value={field.label}
               onChangeText={(label) => update({ label })}
+              onBlur={onLabelBlur}
               placeholder="Question text"
               placeholderTextColor={colors.text.placeholder}
             />

@@ -131,35 +131,40 @@ export default function FormBuilderScreen() {
   const collapseAll = () => setExpandedFieldIds(new Set());
   const expandAll = () => setExpandedFieldIds(new Set(state.fields.map((f) => f.id)));
 
-  // Auto-assign an id from the label on first edit, mirroring the web
-  // builder's behavior, so users never have to hand-type a slug.
-  const handleFieldChange = (index: number, updated: FieldDef) => {
+  // Auto-assign an id from the label when the label input blurs, mirroring the
+  // web builder's behavior. Doing it on blur (not on every keystroke) keeps the
+  // field.id stable while the user is typing so the component key never changes
+  // mid-edit — which previously caused the expanded row to collapse on the first
+  // character typed.
+  const handleFieldLabelBlur = (index: number) => {
+    const field = state.fields[index];
+    if (!field || !field.id.startsWith('field-') || !field.label.trim()) return;
+
+    const existingIds = new Set(state.fields.filter((_, i) => i !== index).map((f) => f.id));
+    const newId = generateFieldId(field.label, existingIds);
+    if (newId === field.id) return;
+
+    const oldId = field.id;
     setState((s) => {
-      let next = updated;
-      const oldId = s.fields[index]?.id;
-      let renamedFrom: string | undefined;
-      // Only auto-generate an id while it's still the placeholder (`field-…`)
-      // or empty — a field that already has a stable, user-derived id keeps it.
-      if (!next.id || next.id.startsWith('field-')) {
-        const existingIds = new Set(s.fields.filter((_, i) => i !== index).map((f) => f.id));
-        if (next.label.trim()) {
-          const newId = generateFieldId(next.label, existingIds);
-          if (newId !== oldId) {
-            renamedFrom = oldId;
-            next = { ...next, id: newId };
-          }
-        }
-      }
-      const fields = s.fields.map((f, i) => {
-        if (i === index) return next;
-        // Cascade the rename: rewrite any other field's showIf reference that
-        // pointed at the old id so a label edit never dangles a reference.
-        if (renamedFrom && f.showIf?.fieldId === renamedFrom) {
-          return { ...f, showIf: { ...f.showIf, fieldId: next.id } };
-        }
-        return f;
-      });
-      return { ...s, fields };
+      const cur = s.fields[index];
+      if (!cur || cur.id !== oldId) return s; // guard: field moved or removed
+      return {
+        ...s,
+        fields: s.fields.map((f, i) => {
+          if (i === index) return { ...f, id: newId };
+          // Cascade the rename so no dangling showIf reference is left behind.
+          if (f.showIf?.fieldId === oldId) return { ...f, showIf: { ...f.showIf, fieldId: newId } };
+          return f;
+        }),
+      };
+    });
+
+    setExpandedFieldIds((prev) => {
+      if (!prev.has(oldId)) return prev;
+      const next = new Set(prev);
+      next.delete(oldId);
+      next.add(newId);
+      return next;
     });
   };
 
@@ -378,7 +383,7 @@ export default function FormBuilderScreen() {
           ) : (
             state.fields.map((field, index) => (
               <FieldEditorRow
-                key={field.id || index}
+                key={field.id}
                 field={field}
                 index={index}
                 total={state.fields.length}
@@ -387,7 +392,8 @@ export default function FormBuilderScreen() {
                 otherFields={state.fields.filter((f) => f.id !== field.id)}
                 expanded={expandedFieldIds.has(field.id)}
                 onToggleExpand={() => toggleFieldExpanded(field.id)}
-                onChange={(updated) => handleFieldChange(index, updated)}
+                onChange={(updated) => updateField(index, updated)}
+                onLabelBlur={() => handleFieldLabelBlur(index)}
                 onRemove={() => removeField(index)}
                 onMoveUp={() => moveField(index, -1)}
                 onMoveDown={() => moveField(index, 1)}

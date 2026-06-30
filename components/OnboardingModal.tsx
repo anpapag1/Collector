@@ -366,11 +366,12 @@ const ILLUSTRATIONS = [
 // ── Main Modal ────────────────────────────────────────────────────────────────
 
 export default function OnboardingModal() {
-  const { hasSeenOnboarding, currentStep, setHasSeenOnboarding, nextStep } = useOnboardingStore();
+  const { hasSeenOnboarding, currentStep, setHasSeenOnboarding, nextStep, manuallyOpened } = useOnboardingStore();
   const session = useAuthStore((s) => s.session);
   const colors = useAppColors();
 
-  const visible = !!session && !hasSeenOnboarding;
+  // Auto-start after first sign-in; manual "App Tour" always works.
+  const visible = manuallyOpened || (!!session && !hasSeenOnboarding);
   const isLast = currentStep === TOTAL - 1;
 
   const scaleAnim   = useRef(new Animated.Value(0.9)).current;

@@ -31,7 +31,7 @@ export default function SettingsScreen() {
   const clearLocalForms = usePickerStore((s) => s.clearLocalForms);
   const devModeEnabled = useDevModeStore((s) => s.enabled);
   const setDevModeEnabled = useDevModeStore((s) => s.setEnabled);
-  const resetOnboarding = useOnboardingStore((s) => s.resetOnboarding);
+  const openTour = useOnboardingStore((s) => s.openTour);
 
   const handleSignOut = () => {
     if (entries.length === 0 && customForms.length === 0) {
@@ -127,7 +127,7 @@ export default function SettingsScreen() {
             <Text style={styles.rowSub}>Version {Constants.expoConfig?.version ?? '—'}</Text>
           </View>
         </View>
-        <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={resetOnboarding}>
+        <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={() => { router.back(); openTour(); }}>
           <MaterialIcons name="school" size={22} color={colors.text.secondary} />
           <View style={styles.rowBody}>
             <Text style={styles.rowTitle}>App Tour</Text>
