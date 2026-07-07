@@ -4,23 +4,27 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   ScrollView,
   Platform,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 import { StorageAccessFramework, writeAsStringAsync, EncodingType } from 'expo-file-system/legacy';
 import { usePickerStore } from '../store/pickerStore';
 import { useAuthStore } from '../store/authStore';
 import { useFormStore } from '../store/formStore';
+import { useFormDraftStore } from '../store/formDraftStore';
 import { loadFromPath, validateFormConfig } from '../utils/schemaLoader';
 import {
   BuilderState,
+  buildAIPrompt,
   createEmptyBuilderState,
   deserializeFormConfig,
   generateFieldId,
@@ -30,6 +34,7 @@ import {
   validateFormConfigForSave,
 } from '../utils/formBuilderSerializer';
 import { createBlankField, FIELD_REGISTRY, FIELD_TYPE_ORDER } from '../utils/fieldRegistry';
+import { FORM_TEMPLATES } from '../utils/formTemplates';
 import { FieldDef, FieldType } from '../types';
 import FieldEditorRow from '../components/formBuilder/FieldEditorRow';
 import SectionsPanel from '../components/formBuilder/SectionsPanel';
@@ -46,12 +51,48 @@ export default function FormBuilderScreen() {
   const setActivePresetId = usePickerStore((s) => s.setActivePresetId);
   const loadSchema = useFormStore((s) => s.loadSchema);
 
-  const [state, setState] = useState<BuilderState>(createEmptyBuilderState());
+  // "Copy & edit" (web dashboard forms grid): the grid already has the full
+  // FormConfig for any visible form in hand (its own, or — in admin mode —
+  // another user's, which never lives in the local pickerStore), and hands
+  // it over via this transient store rather than a route param. Seeded with
+  // a blank id/"(copy)" title so saving inserts a new form instead of
+  // updating the original — mirrors Collector-Web's dashboard.js:1811-1826
+  // copy-edit button exactly.
+  const [duplicateSeed] = useState(() => useFormDraftStore.getState().takeDuplicateSeed());
+  const { template } = useLocalSearchParams<{ template?: string }>();
+
+  const [state, setState] = useState<BuilderState>(() => {
+    if (duplicateSeed) {
+      return deserializeFormConfig({
+        ...duplicateSeed,
+        formId: `${slugify(duplicateSeed.formTitle)}-copy-${Math.random().toString(36).slice(2, 8)}`,
+        formTitle: `${duplicateSeed.formTitle} (copy)`,
+      });
+    }
+    if (template === 'blank') {
+      return createEmptyBuilderState();
+    }
+    if (template) {
+      const tmpl = FORM_TEMPLATES.find((t) => t.key === template);
+      if (tmpl) return deserializeFormConfig(tmpl.schema);
+    }
+    return createEmptyBuilderState();
+  });
+  // Shown once, for a genuinely brand-new form (not a duplicate) — lets the
+  // user start blank or from a template instead of always starting empty.
+  // Mirrors Collector-Web's "Choose a template" dropdown on Create form.
+  const [showTemplatePicker, setShowTemplatePicker] = useState(!duplicateSeed && !template);
   const [metaExpanded, setMetaExpanded] = useState(true);
   const [sectionsExpanded, setSectionsExpanded] = useState(false);
   const [expandedFieldIds, setExpandedFieldIds] = useState<Set<string>>(new Set());
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [showFormErrors, setShowFormErrors] = useState(false);
+  const [slugSuffix] = useState(() => Math.random().toString(36).slice(2, 8));
+
+  const pickTemplate = (schema: (typeof FORM_TEMPLATES)[number]['schema'] | null) => {
+    if (schema) setState(deserializeFormConfig(schema));
+    setShowTemplatePicker(false);
+  };
 
   const { valid, errors } = useMemo(() => validateFormConfigForSave(state), [state]);
   const formErrors = useMemo(
@@ -168,11 +209,7 @@ export default function FormBuilderScreen() {
     });
   };
 
-  const handleFormIdBlur = () => {
-    if (!state.formId.trim() && state.formTitle.trim()) {
-      setState((s) => ({ ...s, formId: slugify(s.formTitle) }));
-    }
-  };
+
 
   const showSnack = (msg: string) => setSnackbar(msg);
 
@@ -224,6 +261,12 @@ export default function FormBuilderScreen() {
     }
   };
 
+  const copyForAI = async () => {
+    const prompt = buildAIPrompt(state);
+    await Clipboard.setStringAsync(prompt);
+    showSnack('AI prompt copied — paste it into your chatbot');
+  };
+
   const handleSave = () => {
     if (!valid) {
       setShowFormErrors(true);
@@ -244,29 +287,64 @@ export default function FormBuilderScreen() {
     router.back();
   };
 
-  return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarBrand}>
+  if (showTemplatePicker) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.topBar}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
             <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <View>
-            <Text style={styles.screenTitle}>Form Builder</Text>
-            <Text style={styles.screenSub}>
-              {state.fields.length} field{state.fields.length === 1 ? '' : 's'} · {state.sections.length} section
-              {state.sections.length === 1 ? '' : 's'}
-            </Text>
-          </View>
+          <Text style={styles.screenTitle}>Start a new form</Text>
         </View>
-        <View style={styles.topBarActions}>
-          <TouchableOpacity style={styles.smallBtn} onPress={collapseAll}>
-            <Text style={styles.smallBtnText}>Collapse all</Text>
+        <ScrollView contentContainerStyle={styles.templatePickerContent}>
+          <Text style={styles.templatePickerHint}>Start blank, or from a template.</Text>
+          <TouchableOpacity style={styles.templateOption} onPress={() => pickTemplate(null)}>
+            <MaterialIcons name="note-add" size={20} color={colors.brand.primary} />
+            <View style={styles.templateOptionText}>
+              <Text style={styles.templateOptionTitle}>Blank form</Text>
+              <Text style={styles.templateOptionSub}>Start from scratch.</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.border.input} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.smallBtn} onPress={expandAll}>
-            <Text style={styles.smallBtnText}>Expand all</Text>
-          </TouchableOpacity>
+          {FORM_TEMPLATES.map((template) => (
+            <TouchableOpacity
+              key={template.key}
+              style={styles.templateOption}
+              onPress={() => pickTemplate(template.schema)}
+            >
+              <MaterialIcons name="description" size={20} color={colors.brand.primary} />
+              <View style={styles.templateOptionText}>
+                <Text style={styles.templateOptionTitle} numberOfLines={2}>{template.label}</Text>
+                <Text style={styles.templateOptionSub}>
+                  {template.schema.fields.length} fields · v{template.schema.version}
+                </Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color={colors.border.input} />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.root}>
+      <View style={styles.topBar}>
+        <View style={styles.topBarInner}>
+          <View style={styles.topBarBrand}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+              <MaterialIcons name="close" size={22} color={colors.text.secondary} />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.screenTitle}>{state.formTitle || 'Untitled Form'}</Text>
+              <Text style={styles.screenSub}>{state.fields.length} fields</Text>
+            </View>
+          </View>
+          <View style={styles.topBarActions}>
+            <TouchableOpacity style={styles.smallBtn} onPress={() => router.push('/settings')}>
+              <Text style={styles.smallBtnText}>Settings</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -276,7 +354,7 @@ export default function FormBuilderScreen() {
           <TouchableOpacity style={styles.panelHeader} onPress={() => setMetaExpanded((v) => !v)}>
             <Text style={styles.panelLabel}>Form Details</Text>
             <View style={styles.panelHeaderRight}>
-              {!metaExpanded && state.formTitle && (
+              {!metaExpanded && !!state.formTitle && (
                 <Text style={styles.panelPreview} numberOfLines={1}>
                   {state.formTitle}
                 </Text>
@@ -303,27 +381,26 @@ export default function FormBuilderScreen() {
                 <Text style={styles.inputLabel}>
                   Title <Text style={styles.requiredMark}>*</Text>
                 </Text>
-                <TextInput
-                  style={styles.input}
-                  value={state.formTitle}
-                  onChangeText={(formTitle) => setState((s) => ({ ...s, formTitle }))}
-                  onBlur={handleFormIdBlur}
-                  placeholder="e.g. Community Health Survey"
-                  placeholderTextColor={colors.text.placeholder}
-                />
-              </View>
-              <View style={styles.metaField}>
-                <Text style={styles.inputLabel}>
-                  Form ID (slug) <Text style={styles.requiredMark}>*</Text>
-                </Text>
-                <TextInput
-                  style={[styles.input, styles.inputMono]}
-                  value={state.formId}
-                  onChangeText={(formId) => setState((s) => ({ ...s, formId: slugify(formId) }))}
-                  placeholder="community-health-v1"
-                  placeholderTextColor={colors.text.placeholder}
-                  autoCapitalize="none"
-                />
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.inputUnboxed}
+                    value={state.formTitle}
+                    onChangeText={(formTitle) =>
+                      setState((s) => ({
+                        ...s,
+                        formTitle,
+                        formId: formTitle.trim() ? `${slugify(formTitle)}-${slugSuffix}` : '',
+                      }))
+                    }
+                    placeholder="e.g. Community Health Survey"
+                    placeholderTextColor={colors.text.placeholder}
+                  />
+                  {!!state.formId && (
+                    <Text style={styles.slugHint} numberOfLines={1}>
+                      [{state.formId}]
+                    </Text>
+                  )}
+                </View>
               </View>
               <View style={styles.metaField}>
                 <Text style={styles.inputLabel}>Version</Text>
@@ -405,19 +482,32 @@ export default function FormBuilderScreen() {
 
       {/* Footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <View style={styles.footerRow}>
-          <TouchableOpacity style={styles.outlineBtn} onPress={importJson}>
-            <Text style={styles.outlineBtnText}>↑ Import JSON</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.outlineBtn} onPress={exportJson}>
-            <Text style={styles.outlineBtnText}>↓ Export JSON</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.footerRow}>
-          <Text style={styles.footerError}>
-            {errors.length > 0 ? (errors.length === 1 ? '1 error — fix to save' : `${errors.length} errors — fix to save`) : ''}
-          </Text>
-          <View style={styles.footerRowRight}>
+        <View style={styles.footerInner}>
+          <View style={styles.footerLeft}>
+            <TouchableOpacity style={styles.outlineBtn} onPress={importJson}>
+              <Text style={styles.outlineBtnText}>↑ Import JSON</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.outlineBtn} onPress={exportJson}>
+              <Text style={styles.outlineBtnText}>↓ Export JSON</Text>
+            </TouchableOpacity>
+            <Pressable
+              onPress={copyForAI}
+              style={({ pressed }) => [styles.outlineBtn, styles.aiBtn, pressed && styles.aiBtnPressed]}
+            >
+              {({ pressed }) => (
+                <>
+                  <MaterialIcons name="auto-awesome" size={14} color={pressed ? '#9333EA' : colors.text.secondary} />
+                  <Text style={[styles.outlineBtnText, pressed && styles.aiBtnTextPressed]}>Copy for AI</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+          <View style={styles.footerRight}>
+            {errors.length > 0 && (
+              <Text style={styles.footerError}>
+                {errors.length === 1 ? '1 error — fix to save' : `${errors.length} errors — fix to save`}
+              </Text>
+            )}
             <TouchableOpacity style={styles.outlineBtn} onPress={() => router.back()}>
               <Text style={styles.outlineBtnText}>Cancel</Text>
             </TouchableOpacity>
@@ -441,13 +531,19 @@ const createStyles = (colors: AppColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background.app },
     topBar: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.section,
+      backgroundColor: colors.background.app,
+    },
+    topBarInner: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 12,
       paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border.section,
+      maxWidth: 800,
+      width: '100%',
+      alignSelf: 'center',
     },
     topBarBrand: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     iconBtn: { padding: 6 },
@@ -464,8 +560,38 @@ const createStyles = (colors: AppColors) =>
     },
     smallBtnText: { fontSize: 11.5, fontWeight: '600', color: colors.text.secondary },
 
+    templatePickerContent: { 
+      padding: 16, 
+      paddingBottom: 24, 
+      gap: 10,
+      maxWidth: 800,
+      width: '100%',
+      alignSelf: 'center',
+    },
+    templatePickerHint: { fontSize: 13, color: colors.text.secondary, marginBottom: 4 },
+    templateOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 14,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border.section,
+      backgroundColor: colors.background.white,
+    },
+    templateOptionText: { flex: 1, gap: 2 },
+    templateOptionTitle: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
+    templateOptionSub: { fontSize: 12, color: colors.text.muted },
+
     body: { flex: 1 },
-    bodyContent: { padding: 16, paddingBottom: 24, gap: 14 },
+    bodyContent: { 
+      padding: 16, 
+      paddingBottom: 24, 
+      gap: 14,
+      maxWidth: 800,
+      width: '100%',
+      alignSelf: 'center',
+    },
 
     panel: {
       borderWidth: 1,
@@ -508,6 +634,29 @@ const createStyles = (colors: AppColors) =>
       color: colors.text.muted,
     },
     requiredMark: { color: colors.text.danger },
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border.input,
+      borderRadius: 10,
+      backgroundColor: colors.background.white,
+      paddingHorizontal: 12,
+    },
+    inputUnboxed: {
+      flex: 1,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: colors.text.primary,
+      padding: 0,
+    },
+    slugHint: {
+      fontSize: 12,
+      color: colors.text.muted,
+      marginLeft: 8,
+      fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+      flexShrink: 1,
+    },
     input: {
       borderWidth: 1,
       borderColor: colors.border.input,
@@ -555,16 +704,30 @@ const createStyles = (colors: AppColors) =>
       borderTopWidth: 1,
       borderTopColor: colors.border.section,
       backgroundColor: colors.background.muted,
-      gap: 10,
     },
-    footerRow: {
+    footerInner: {
+      maxWidth: 800,
+      width: '100%',
+      alignSelf: 'center',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    footerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
       gap: 8,
     },
-    footerRowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    footerError: { flex: 1, fontSize: 12, fontWeight: '600', color: colors.text.danger },
+    footerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    footerError: { fontSize: 12, fontWeight: '600', color: colors.text.danger, marginRight: 4 },
     outlineBtn: {
       borderWidth: 1,
       borderColor: colors.border.input,
@@ -574,6 +737,9 @@ const createStyles = (colors: AppColors) =>
       backgroundColor: colors.background.white,
     },
     outlineBtnText: { fontSize: 12.5, fontWeight: '600', color: colors.text.secondary },
+    aiBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    aiBtnPressed: { borderColor: '#9333EA', backgroundColor: '#F3E8FF' },
+    aiBtnTextPressed: { color: '#9333EA' },
     saveBtn: {
       backgroundColor: colors.brand.primary,
       borderRadius: 9,

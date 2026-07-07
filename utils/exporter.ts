@@ -1,9 +1,29 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import JSZip from 'jszip';
-import { Image } from 'react-native';
+import { Image, Platform } from 'react-native';
 import { Entry, FieldDef, FormConfig, PhotoItem } from '../types';
 import { selectValueLabel } from './formLogic';
 import { getEntryDisplayNumbers } from './entryNumbering';
+
+// Native's `photo.uri` is a local file, read directly. Web has no local
+// filesystem — the caller resolves a signed URL first (see
+// utils/photoUrls.ts) and this fetches its bytes instead.
+async function readPhotoAsBase64(uri: string): Promise<string> {
+  if (Platform.OS === 'web') {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error ?? new Error('Failed to read photo blob'));
+      reader.onload = () => {
+        const result = String(reader.result);
+        resolve(result.slice(result.indexOf(',') + 1));
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+  return FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+}
 
 // Flattens "Other: <text>" select values (and arrays of them) into plain
 // strings so exports stay readable instead of dumping raw objects.
@@ -96,15 +116,15 @@ function csvFieldsFor(entries: Entry[], schema: FormConfig) {
   return fields;
 }
 
-export async function buildAndExport(
+export async function buildZipBase64(
   entries: Entry[],
   schema: FormConfig,
-  onProgress: (pct: number) => void
-): Promise<{ path: string; skippedPhotos: number }> {
+  onProgress: (pct: number) => void,
+  resolvePhotoUri?: (photo: PhotoItem, entry: Entry) => Promise<string | null>
+): Promise<{ base64: string; skippedPhotos: number }> {
   const zip = new JSZip();
   const imgFolder = zip.folder('images');
   if (!imgFolder) throw new Error('Failed to create images folder in export zip');
-  const filename = exportFilename(schema.formId);
 
   const totalPhotos = entries.reduce((sum, entry) => {
     const fieldIds = imageFieldIdsFor(entry);
@@ -129,9 +149,9 @@ export async function buildAndExport(
           const ph = photos[i];
           const imgName = `${entry.id}_${fieldId}_photo_${i}.jpg`;
           try {
-            const b64 = await FileSystem.readAsStringAsync(ph.uri, {
-              encoding: FileSystem.EncodingType.Base64,
-            });
+            const uri = resolvePhotoUri ? await resolvePhotoUri(ph, entry) : ph.uri;
+            if (!uri) throw new Error(`Could not resolve a URL for photo ${ph.id}`);
+            const b64 = await readPhotoAsBase64(uri);
             imgFolder.file(imgName, b64, { base64: true });
             imagePaths.push(`images/${imgName}`);
           } catch {
@@ -173,22 +193,36 @@ export async function buildAndExport(
 
   onProgress(85);
   const zipBase64 = await zip.generateAsync({ type: 'base64' });
-  onProgress(95);
-
-  const outPath = FileSystem.cacheDirectory + filename;
-  await FileSystem.writeAsStringAsync(outPath, zipBase64, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
   onProgress(100);
-  return { path: outPath, skippedPhotos };
+
+  return { base64: zipBase64, skippedPhotos };
 }
 
-export async function buildCsvExport(
+export async function buildAndExport(
   entries: Entry[],
   schema: FormConfig,
   onProgress: (pct: number) => void
-): Promise<{ path: string }> {
+): Promise<{ path: string; skippedPhotos: number }> {
+  const { base64, skippedPhotos } = await buildZipBase64(entries, schema, onProgress);
+  const filename = exportFilename(schema.formId);
+  const outPath = (FileSystem.cacheDirectory ?? '') + filename;
+  
+  await FileSystem.writeAsStringAsync(outPath, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  return { path: outPath, skippedPhotos };
+}
+
+// Pure string-building, no filesystem access \u2014 shared by the native export
+// screen (which writes the result to FileSystem.cacheDirectory below) and the
+// web dashboard's export screen (which delivers it via a Blob download
+// instead, since there's no native filesystem on web).
+export function buildCsvString(
+  entries: Entry[],
+  schema: FormConfig,
+  onProgress: (pct: number) => void
+): { csv: string; filename: string } {
   const filename = csvExportFilename(schema.formId);
   const fields = csvFieldsFor(entries, schema);
   const headers = ['id', 'seq', 'createdAt', 'formTitle', ...fields.map((field) => field.label)];
@@ -208,6 +242,15 @@ export async function buildCsvExport(
   });
 
   const csv = `\uFEFF${headers.map(csvEscape).join(',')}\r\n${rows.join('\r\n')}`;
+  return { csv, filename };
+}
+
+export async function buildCsvExport(
+  entries: Entry[],
+  schema: FormConfig,
+  onProgress: (pct: number) => void
+): Promise<{ path: string }> {
+  const { csv, filename } = buildCsvString(entries, schema, onProgress);
   onProgress(90);
 
   const outPath = FileSystem.cacheDirectory + filename;
@@ -278,11 +321,16 @@ function getImageSize(uri: string): Promise<{ width: number; height: number }> {
   });
 }
 
-export async function buildXlsxExport(
+// Pure workbook-building (no filesystem access) — shared by the native
+// export screen (which writes the result to FileSystem.cacheDirectory below)
+// and the web dashboard's export screen (which turns the base64 into a
+// downloadable Blob instead, since there's no native filesystem on web).
+export async function buildXlsxWorkbookBase64(
   entries: Entry[],
   schema: FormConfig,
-  onProgress: (pct: number) => void
-): Promise<{ path: string; skippedPhotos: number }> {
+  onProgress: (pct: number) => void,
+  resolvePhotoUri?: (photo: PhotoItem, entry: Entry) => Promise<string | null>
+): Promise<{ base64: string; skippedPhotos: number }> {
   const zip = new JSZip();
   const fields = schema.fields;
   const headers = ['ID', 'Created', 'Updated', 'Form', ...fields.map((f) => f.label)];
@@ -316,9 +364,11 @@ export async function buildXlsxExport(
       for (let pi = 0; pi < photos.length; pi++) {
         const ph = photos[pi];
         try {
-          const b64 = await FileSystem.readAsStringAsync(ph.uri, { encoding: FileSystem.EncodingType.Base64 });
-          const { width: imgW, height: imgH } = await getImageSize(ph.uri);
-          const ext = ph.uri.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+          const uri = resolvePhotoUri ? await resolvePhotoUri(ph, entry) : ph.uri;
+          if (!uri) throw new Error(`Could not resolve a URL for photo ${ph.id}`);
+          const b64 = await readPhotoAsBase64(uri);
+          const { width: imgW, height: imgH } = await getImageSize(uri);
+          const ext = uri.toLowerCase().split('?')[0].endsWith('.png') ? 'png' : 'jpeg';
           const mediaIndex = media.length + 1;
           const MAX_W = 112, MAX_H = 76;
           const scale = Math.min(MAX_W / imgW, MAX_H / imgH);
@@ -465,8 +515,19 @@ export async function buildXlsxExport(
   const xlsxBase64 = await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
   onProgress(97);
 
+  return { base64: xlsxBase64, skippedPhotos };
+}
+
+export async function buildXlsxExport(
+  entries: Entry[],
+  schema: FormConfig,
+  onProgress: (pct: number) => void,
+  resolvePhotoUri?: (photo: PhotoItem, entry: Entry) => Promise<string | null>
+): Promise<{ path: string; skippedPhotos: number }> {
+  const { base64, skippedPhotos } = await buildXlsxWorkbookBase64(entries, schema, onProgress, resolvePhotoUri);
+
   const outPath = (FileSystem.cacheDirectory ?? '') + xlsxExportFilename(schema.formId);
-  await FileSystem.writeAsStringAsync(outPath, xlsxBase64, { encoding: FileSystem.EncodingType.Base64 });
+  await FileSystem.writeAsStringAsync(outPath, base64, { encoding: FileSystem.EncodingType.Base64 });
 
   onProgress(100);
   return { path: outPath, skippedPhotos };

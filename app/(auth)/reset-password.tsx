@@ -111,6 +111,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   content: {
     paddingHorizontal: 24,
     flexGrow: 1,
+    ...(Platform.OS === 'web' ? { width: '100%' as const, maxWidth: 440, alignSelf: 'center' as const } : null),
   },
   closeBtn: {
     alignSelf: 'flex-end',

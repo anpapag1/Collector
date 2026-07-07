@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import * as Sentry from '@sentry/react-native';
@@ -87,8 +88,16 @@ async function runSync(): Promise<void> {
       // back to 'synced', so the edit isn't lost.
       const pushedUpdatedAt = entry.updatedAt;
       try {
-        const { remoteId, remoteUpdatedAt } = await syncOneEntry(entry, userId);
-        markSynced(entry.id, remoteId, remoteUpdatedAt, pushedUpdatedAt);
+        const formId = await resolveEntryFormId(entry, userId);
+        if (!formId) {
+          // The form this entry belongs to hasn't synced yet (and couldn't be
+          // pushed now either — e.g. offline, or genuinely gone). Leave this
+          // entry as an error so it's retried on the next pass, once the form
+          // has had a chance to sync.
+          throw new Error("This entry's form hasn't finished syncing yet — will retry automatically.");
+        }
+        const { remoteId, remoteUpdatedAt } = await syncOneEntry(entry, userId, formId);
+        markSynced(entry.id, remoteId, remoteUpdatedAt, pushedUpdatedAt, formId);
         debugLog(`[sync] entry ${entry.id} synced ok -> remoteId ${remoteId}`);
       } catch (err) {
         const message = errorMessage(err);
@@ -133,9 +142,30 @@ async function runSync(): Promise<void> {
   }
 }
 
+// Resolves the Supabase forms.id (`forms.id`) that entry-photos Storage
+// objects for this entry should live under, so ownership reassignment (see
+// services/adminService.ts's switchFormOwner) never has to move files.
+// Prefers the entry's own cache; falls back to looking up the CustomForm it
+// was created against (store/pickerStore.ts) by its local formImportId, and
+// pushes that form now if it hasn't synced yet — otherwise an entry
+// collected against a brand-new form would stay stuck waiting for some
+// unrelated future sync pass to happen to push the form first.
+async function resolveEntryFormId(entry: Entry, userId: string): Promise<string | null> {
+  if (entry.formRemoteId) return entry.formRemoteId;
+  if (!entry.formImportId) return null;
+
+  const form = usePickerStore.getState().customForms.find((f) => f.importId === entry.formImportId);
+  if (!form) return null;
+  if (form.remoteId) return form.remoteId;
+
+  await pushFormToSupabase(form.importId, form.config, userId, form.remoteId ?? null);
+  return usePickerStore.getState().customForms.find((f) => f.importId === entry.formImportId)?.remoteId ?? null;
+}
+
 async function syncOneEntry(
   entry: Entry,
-  userId: string
+  userId: string,
+  formId: string
 ): Promise<{ remoteId: string; remoteUpdatedAt: number }> {
   // Only entries that have synced at least once, AND whose remoteUpdatedAt
   // we actually know, can conflict — a brand-new entry (no remoteId yet)
@@ -183,7 +213,7 @@ async function syncOneEntry(
     existingRemoteData = (existing?.data as Record<string, any>) ?? null;
   }
 
-  const remoteData = await uploadEntryPhotos(entry, userId, existingRemoteData);
+  const remoteData = await uploadEntryPhotos(entry, formId, existingRemoteData);
 
   const { data, error } = await withTimeout(
     supabase
@@ -192,6 +222,7 @@ async function syncOneEntry(
         {
           local_id: entry.id,
           user_id: userId,
+          form_id: formId,
           form_title: entry.formTitle ?? null,
           fields: entry.fields ?? null,
           data: remoteData,
@@ -220,7 +251,7 @@ async function syncOneEntry(
 // forward by its stored {id, path} so it stays on the server.
 async function uploadEntryPhotos(
   entry: Entry,
-  userId: string,
+  formId: string,
   existingRemoteData: Record<string, any> | null = null
 ): Promise<Record<string, any>> {
   const remoteData: Record<string, any> = { ...entry.data };
@@ -230,9 +261,18 @@ async function uploadEntryPhotos(
     const photos: PhotoItem[] = entry.data[field.id] ?? [];
     const localPhotos = Array.isArray(photos) ? photos : [];
 
-    const uploaded = await Promise.all(
-      localPhotos.map((photo) => uploadOnePhoto(entry.id, photo, userId))
-    );
+    // A photo with no local `uri` (only `path`) has already been uploaded and
+    // was never re-downloaded onto this device — nothing to read locally, so
+    // carry its existing path forward instead of re-uploading.
+    const toUpload = localPhotos.filter((p): p is PhotoItem & { uri: string } => typeof p.uri === 'string');
+    const alreadyUploaded = localPhotos
+      .filter((p) => typeof p.uri !== 'string' && typeof p.path === 'string')
+      .map((p) => ({ id: p.id, path: p.path as string }));
+
+    const uploaded = [
+      ...(await Promise.all(toUpload.map((photo) => uploadOnePhoto(entry.id, photo, formId)))),
+      ...alreadyUploaded,
+    ];
 
     // Carry forward any remote photo whose id isn't in the local set — those
     // are photos the server has that this device never downloaded (partial
@@ -253,10 +293,10 @@ async function uploadEntryPhotos(
 
 async function uploadOnePhoto(
   entryId: string,
-  photo: PhotoItem,
-  userId: string
+  photo: PhotoItem & { uri: string },
+  formId: string
 ): Promise<{ id: string; path: string }> {
-  const storagePath = `${userId}/${entryId}/${photo.id}.jpg`;
+  const storagePath = `${formId}/${entryId}/${photo.id}.jpg`;
 
   const base64 = await withTimeout(
     FileSystem.readAsStringAsync(photo.uri, { encoding: FileSystem.EncodingType.Base64 }),
@@ -297,10 +337,15 @@ async function pullRemoteEntries(userId: string): Promise<void> {
   // pending deletion so it isn't re-downloaded before its delete lands.
   const pendingLocalIdSet = new Set(pendingLocalIdDeletions);
 
+  // Lightweight pass first: just enough per row (no `data`/`fields`, which
+  // carry the photo path arrays and dominate row size) to work out which
+  // rows are actually missing or stale locally. Most sync passes touch zero
+  // or a handful of rows, so this avoids re-downloading the full payload for
+  // every entry in the account on every pass.
   const { data: rows, error } = await withTimeout(
     supabase
       .from('entries')
-      .select('id, local_id, form_title, fields, data, created_at, updated_at')
+      .select('id, local_id, updated_at')
       .eq('user_id', userId),
     DB_QUERY_TIMEOUT_MS,
     'Pulling entries timed out'
@@ -311,23 +356,61 @@ async function pullRemoteEntries(userId: string): Promise<void> {
     return;
   }
 
-  const missing: typeof rows = [];
-  const stale: typeof rows = [];
+  const missingIds: string[] = [];
+  const staleIds: string[] = [];
+  const remoteIdSet = new Set((rows ?? []).map((r) => r.id));
+
   for (const row of rows ?? []) {
     if (pendingDeletionIds.has(row.id)) continue;
     if (pendingLocalIdSet.has(row.local_id)) continue;
     const local = localById.get(row.local_id);
     if (!local) {
-      missing.push(row);
+      missingIds.push(row.id);
       continue;
     }
     if (local.syncStatus !== 'synced') continue;
     const remoteUpdatedAt = new Date(row.updated_at).getTime();
     if ((local.remoteUpdatedAt ?? 0) < remoteUpdatedAt) {
-      stale.push(row);
+      staleIds.push(row.id);
     }
   }
-  if (missing.length === 0 && stale.length === 0) return;
+
+  // Detect and prune local entries that were deleted on the server
+  const deletedLocalIds: string[] = [];
+  for (const local of entries) {
+    if (local.userId === userId && local.remoteId && !remoteIdSet.has(local.remoteId)) {
+      // It was previously synced (has remoteId), but the server no longer returned
+      // it in the full pull for this user. It was deleted by another device/web.
+      deletedLocalIds.push(local.id);
+    }
+  }
+
+  if (deletedLocalIds.length > 0) {
+    useEntriesStore.getState().removeLocalOnly(deletedLocalIds);
+  }
+
+  if (missingIds.length === 0 && staleIds.length === 0) return;
+
+  // Second pass: fetch the full payload (including `data`/`fields`) only for
+  // the rows actually needed, instead of every row in the account.
+  const neededIds = [...missingIds, ...staleIds];
+  const { data: fullRows, error: fullError } = await withTimeout(
+    supabase
+      .from('entries')
+      .select('id, local_id, form_id, form_title, fields, data, created_at, updated_at')
+      .in('id', neededIds),
+    DB_QUERY_TIMEOUT_MS,
+    'Pulling entry details timed out'
+  );
+  if (fullError) {
+    console.warn('[sync] pull details failed', fullError);
+    Sentry.captureException(fullError);
+    return;
+  }
+
+  const fullById = new Map((fullRows ?? []).map((row) => [row.id, row]));
+  const missing = missingIds.map((id) => fullById.get(id)).filter((row): row is NonNullable<typeof row> => !!row);
+  const stale = staleIds.map((id) => fullById.get(id)).filter((row): row is NonNullable<typeof row> => !!row);
 
   const [missingResults, staleResults] = await Promise.all([
     Promise.allSettled(missing.map((row) => downloadRemoteEntry(row, userId))),
@@ -361,6 +444,7 @@ async function downloadRemoteEntry(
   row: {
     id: string;
     local_id: string;
+    form_id: string;
     form_title: string | null;
     fields: Entry['fields'];
     data: Record<string, any>;
@@ -413,6 +497,7 @@ async function downloadRemoteEntry(
     createdAt: new Date(row.created_at).getTime(),
     formTitle: row.form_title ?? undefined,
     fields: row.fields ?? undefined,
+    formRemoteId: row.form_id,
     data: localData,
     userId,
     syncStatus: 'synced',
@@ -423,6 +508,17 @@ async function downloadRemoteEntry(
 }
 
 async function downloadOnePhoto(photo: { id: string; path: string }): Promise<PhotoItem> {
+  // There is no local filesystem on web (expo-file-system's downloadAsync
+  // throws "not available on web"), so there's nothing to download to. The
+  // web dashboard instead resolves a fresh signed URL on demand when it
+  // actually needs to display a photo (utils/photoUrls.ts), recomputing this
+  // same `{userId}/{entryId}/{photoId}.jpg` storage path. Storing the raw
+  // path here (rather than a real local uri) is enough to mark this photo
+  // "synced" so it isn't endlessly retried every sync pass.
+  if (Platform.OS === 'web') {
+    return { id: photo.id, uri: photo.path };
+  }
+
   const dest = (FileSystem.documentDirectory ?? '') + `${photo.id}.jpg`;
 
   const { data, error } = await supabase.storage

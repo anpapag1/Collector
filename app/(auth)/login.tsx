@@ -205,6 +205,10 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   content: {
     paddingHorizontal: 24,
     flexGrow: 1,
+    // Web has no phone-width ceiling like native does, so without a cap this
+    // card stretches full-bleed across a desktop browser. Native screens are
+    // already narrower than this, so the cap is a no-op there.
+    ...(Platform.OS === 'web' ? { width: '100%' as const, maxWidth: 440, alignSelf: 'center' as const } : null),
   },
   closeBtn: {
     alignSelf: 'flex-end',

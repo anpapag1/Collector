@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, ActivityIndicator } from 'react-native';
 import { showDialog } from '../store/dialogStore';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,8 +14,10 @@ import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import ScreenBubbles from '../components/ScreenBubbles';
 import ThemeToggle from '../components/ThemeToggle';
+import Toast from '../components/Toast';
 import { useThemeStore } from '../store/themeStore';
 import { useOnboardingStore } from '../store/onboardingStore';
+import { DEV_TEST_ENTRY_COUNT, seedDevTestData } from '../utils/devSeed';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -32,6 +34,32 @@ export default function SettingsScreen() {
   const devModeEnabled = useDevModeStore((s) => s.enabled);
   const setDevModeEnabled = useDevModeStore((s) => s.setEnabled);
   const openTour = useOnboardingStore((s) => s.openTour);
+  const [seedingTestData, setSeedingTestData] = useState(false);
+  const [snackbar, setSnackbar] = useState<string | null>(null);
+
+  const handleAddTestData = () => {
+    showDialog({
+      title: 'Add test form + entries?',
+      message: `Creates "Dev Test Form" (one field of every type) and seeds it with ${DEV_TEST_ENTRY_COUNT} entries, each with a photo from assets/template.jpg.`,
+      actions: [
+        { label: 'Cancel', style: 'cancel' },
+        {
+          label: 'Add',
+          onPress: async () => {
+            setSeedingTestData(true);
+            try {
+              const { entryCount } = await seedDevTestData();
+              setSnackbar(`Added Dev Test Form with ${entryCount} entries`);
+            } catch (e) {
+              setSnackbar(e instanceof Error ? e.message : 'Failed to add test data');
+            } finally {
+              setSeedingTestData(false);
+            }
+          },
+        },
+      ],
+    });
+  };
 
   const handleSignOut = () => {
     if (entries.length === 0 && customForms.length === 0) {
@@ -153,8 +181,27 @@ export default function SettingsScreen() {
               thumbColor={colors.background.white}
             />
           </View>
+          <TouchableOpacity
+            style={[styles.row, { marginTop: 8 }]}
+            onPress={handleAddTestData}
+            disabled={seedingTestData}
+          >
+            {seedingTestData ? (
+              <ActivityIndicator size="small" color={colors.text.secondary} />
+            ) : (
+              <MaterialIcons name="science" size={22} color={colors.text.secondary} />
+            )}
+            <View style={styles.rowBody}>
+              <Text style={styles.rowTitle}>Add test form + entries</Text>
+              <Text style={styles.rowSub}>
+                Creates a form with every field type and {DEV_TEST_ENTRY_COUNT} sample entries
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
       )}
+
+      <Toast message={snackbar} onDismiss={() => setSnackbar(null)} />
     </View>
   );
 }

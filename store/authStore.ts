@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import type { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
@@ -182,6 +183,33 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   signInWithGoogle: async () => {
     set({ loading: true, error: null });
+
+    // Web has no in-app browser to hand off to and no custom URL scheme to
+    // catch a redirect with — the normal web OAuth flow is a full-page
+    // navigation to the provider and back. Supabase's client then picks the
+    // session up from the URL fragment on return (see lib/supabase.ts's
+    // `detectSessionInUrl: Platform.OS === 'web'`), and the `onAuthStateChange`
+    // listener in init() above fires SIGNED_IN — no token-parsing needed here.
+    if (Platform.OS === 'web') {
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: `${window.location.origin}/auth-callback` },
+        });
+        if (error) {
+          set({ loading: false, error: error.message });
+          return { error: error.message };
+        }
+        // Page is navigating away to the provider now; loading state doesn't
+        // matter past this point for this call.
+        return { error: null };
+      } catch (e: any) {
+        const message = e?.message ?? 'Google sign-in failed';
+        set({ loading: false, error: message });
+        return { error: message };
+      }
+    }
+
     try {
       const redirectTo = Linking.createURL('auth-callback');
       const { data, error } = await supabase.auth.signInWithOAuth({

@@ -12,6 +12,7 @@ import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEntriesStore } from '../store/entriesStore';
 import { useFormStore } from '../store/formStore';
+import { usePickerStore } from '../store/pickerStore';
 import { useAuthStore } from '../store/authStore';
 import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
@@ -32,9 +33,33 @@ export default function ExportScreen() {
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const allEntries = useEntriesStore((s) => s.entries);
-  const schema = useFormStore((s) => s.schema);
+  const initialSchema = useFormStore((s) => s.schema);
+  const customForms = usePickerStore((s) => s.customForms);
   const session = useAuthStore((s) => s.session);
   const currentUserId = session?.user?.id ?? null;
+
+  const availableForms = useMemo(() => {
+    return customForms
+      .filter((f) => (currentUserId ? f.userId === currentUserId || f.userId == null : f.userId == null))
+      .map(f => ({
+        id: f.importId,
+        title: f.config.formTitle,
+        config: f.config,
+        ownerId: f.userId ?? currentUserId ?? ''
+      }));
+  }, [customForms, currentUserId]);
+
+  const [selectedFormId, setSelectedFormId] = useState<string | null>(initialSchema?.formId ?? null);
+
+  useEffect(() => {
+    if (!selectedFormId && availableForms.length > 0) {
+      setSelectedFormId(availableForms[0].id);
+    }
+  }, [selectedFormId, availableForms]);
+
+  const activeForm = useMemo(() => availableForms.find(f => f.id === selectedFormId), [availableForms, selectedFormId]);
+  const schema = activeForm?.config ?? null;
+
   // Never export another already-claimed account's entries that happen to
   // still be cached on this device — only the signed-in account's own
   // entries plus any not-yet-claimed (userId == null) local entries.
@@ -55,10 +80,18 @@ export default function ExportScreen() {
   const [phase, setPhase] = useState<Phase>('summary');
   const [exportKind, setExportKind] = useState<ExportKind>('xlsx');
   const [formatMenuOpen, setFormatMenuOpen] = useState(false);
+  const [formMenuOpen, setFormMenuOpen] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
+
+  // Reset export status when the selected form changes
+  useEffect(() => {
+    setPhase('summary');
+    setProgress(0);
+    setError(null);
+  }, [selectedFormId]);
 
   const photoTotal = useMemo(
     () =>
@@ -189,8 +222,56 @@ export default function ExportScreen() {
                 </View>
               </View>
 
+              <View style={styles.formatRow}>
+                <Text style={styles.cardRowLabel}>Form</Text>
+                <TouchableOpacity
+                  style={styles.formatSelect}
+                  onPress={() => {
+                    setFormMenuOpen((open) => !open);
+                    setFormatMenuOpen(false);
+                  }}
+                  activeOpacity={0.78}
+                >
+                  <Text style={styles.formatSelectText} numberOfLines={1} ellipsizeMode="middle">
+                    {schema?.formTitle ?? 'Select a form'}
+                  </Text>
+                  <MaterialIcons
+                    name={formMenuOpen ? 'expand-less' : 'expand-more'}
+                    size={20}
+                    color={colors.text.secondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {formMenuOpen && (
+                <View style={styles.formatMenu}>
+                  {availableForms.map((f) => {
+                    const isSelected = f.id === selectedFormId;
+                    return (
+                      <TouchableOpacity
+                        key={f.id}
+                        style={[
+                          styles.formatOption,
+                          isSelected && styles.formatOptionActive,
+                        ]}
+                        onPress={() => {
+                          setSelectedFormId(f.id);
+                          setFormMenuOpen(false);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.formatOptionText} numberOfLines={1}>{f.title}</Text>
+                        </View>
+                        {isSelected && (
+                          <MaterialIcons name="check" size={18} color={colors.brand.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
               {[
-                { label: 'Form', value: schema?.formTitle ?? '-' },
                 { label: 'Entries', value: String(entries.length) },
                 { label: 'Photos', value: String(photoTotal) },
               ].map((row) => (
@@ -204,7 +285,10 @@ export default function ExportScreen() {
                 <Text style={styles.cardRowLabel}>Export format</Text>
                 <TouchableOpacity
                   style={styles.formatSelect}
-                  onPress={() => setFormatMenuOpen((open) => !open)}
+                  onPress={() => {
+                    setFormatMenuOpen((open) => !open);
+                    setFormMenuOpen(false);
+                  }}
                   activeOpacity={0.78}
                 >
                   <MaterialIcons
@@ -416,17 +500,20 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     paddingVertical: 12,
   },
   formatSelect: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
     minHeight: 38,
     paddingHorizontal: 12,
+    marginLeft: 16,
     borderRadius: 12,
     backgroundColor: colors.background.white,
     borderWidth: 1,
     borderColor: colors.brand.primary,
   },
   formatSelectText: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
     color: colors.text.primary,

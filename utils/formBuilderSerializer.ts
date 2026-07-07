@@ -156,6 +156,47 @@ export function validateFormConfigForSave(state: BuilderState): {
   return { valid: errors.length === 0, errors };
 }
 
+// Builds a prompt a user can paste into a chatbot to draft/edit a form's
+// JSON with an LLM, then re-import the result via the Import JSON button.
+export function buildAIPrompt(state: BuilderState): string {
+  const seed = serializeFormConfig(state);
+  const schemaContract = `FormConfig {
+  formId: string          // url-safe slug, e.g. "site-inspection"
+  formTitle: string
+  version: string          // e.g. "1.0"
+  sections?: [{ id: string, title: string }]
+  fields: [{
+    id: string             // unique, url-safe slug
+    label: string
+    type: "text" | "textarea" | "number" | "select" | "boolean" | "rating" | "image" | "gps" | "date"
+    required?: boolean
+    placeholder?: string
+    options?: string[]     // "select" fields only
+    multiple?: boolean     // "select": allow multiple choices; "image": allow multiple photos
+    allowOther?: boolean   // "select" fields only, adds a free-text "Other" choice
+    max?: number           // "rating" fields only, e.g. 5
+    auto?: boolean         // "gps"/"date" fields only, auto-capture current location/date
+    sectionId?: string     // must match an id in "sections"
+    showIf?: { fieldId: string, equals: string | string[] } // conditionally show this field
+  }]
+}`;
+
+  return `I'm building a data-collection form and need you to write its JSON definition.
+
+Schema it must match (TypeScript-style, for your reference only — do not include comments in your output):
+${schemaContract}
+
+Title and fields are going to be described after the prompt definition below.
+
+Current draft (edit this, or ignore it and start fresh if I said so below):
+${JSON.stringify(seed, null, 2)}
+
+Title: <insert your form title here>
+Fields I want (describe them in plain language, or paste a document describing them): <insert your field description here>
+
+Output ONLY the final JSON in a single fenced code block, valid against the schema above. No explanations before or after.`;
+}
+
 export function slugify(input: string): string {
   return input
     .trim()

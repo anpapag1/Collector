@@ -1,8 +1,9 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Entry, PhotoItem } from '../types';
 import { timeAgo } from '../utils/timeUtils';
+import { previewTitleForEntry } from '../utils/entryPreview';
 import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import { useAuthStore } from '../store/authStore';
@@ -14,9 +15,17 @@ type Props = {
   onOpen: () => void;
   onDelete?: () => void;
   showCoords?: boolean;
+  // Web-only: native's `photo.uri` is already a local file path usable
+  // directly in <Image>; the web dashboard has no local filesystem, so it
+  // passes this to resolve a signed URL on demand instead (see
+  // utils/photoUrls.ts). Native call sites omit it and behavior is unchanged.
+  resolvePhotoUri?: (photo: PhotoItem) => Promise<string | null>;
+  // Web-only, admin mode: shown as a small chip when viewing another user's
+  // entries. Native never passes this.
+  ownerLabel?: string;
 };
 
-function EntryCard({ entry, displayNumber, onOpen }: Props) {
+function EntryCard({ entry, displayNumber, onOpen, resolvePhotoUri, ownerLabel }: Props) {
   const colors = useAppColors();
   const styles = useThemedStyles(createStyles);
   const syncStatusMeta: Record<
@@ -31,23 +40,7 @@ function EntryCard({ entry, displayNumber, onOpen }: Props) {
   const { createdAt, formTitle, fields, data } = entry;
   const displayLabel = `#${String(displayNumber).padStart(2, '0')}`;
 
-  // Pull first meaningful text value as preview title
-  const previewTitle = (() => {
-    if (fields) {
-      for (const f of fields) {
-        if ((f.type === 'text' || f.type === 'textarea') && data[f.id]) {
-          const val = String(data[f.id]).trim();
-          if (val) return val;
-        }
-      }
-    } else {
-      // Legacy: scan data values
-      for (const v of Object.values(data)) {
-        if (typeof v === 'string' && v.trim()) return v.trim();
-      }
-    }
-    return null;
-  })();
+  const previewTitle = previewTitleForEntry(entry);
 
   // Count meaningful field types present
   const hasGps = fields
@@ -63,26 +56,48 @@ function EntryCard({ entry, displayNumber, onOpen }: Props) {
     return (data.photo ?? []).length;
   })();
 
-  const firstPhotoUri = (() => {
-    const findUri = (photos: unknown): string | null => {
+  const firstPhoto = (() => {
+    const findPhoto = (photos: unknown): PhotoItem | null => {
       if (!Array.isArray(photos)) return null;
+      // Accept either shape: `uri` (not yet uploaded / rehydrated locally on
+      // native) or `path` (already uploaded — resolved to a URL on demand via
+      // resolvePhotoUri, which only needs `photo.id`, not `uri` itself).
       const first = photos.find((photo): photo is PhotoItem => {
-        return !!photo && typeof photo === 'object' && typeof (photo as PhotoItem).uri === 'string';
+        if (!photo || typeof photo !== 'object') return false;
+        const p = photo as PhotoItem;
+        return typeof p.uri === 'string' || typeof p.path === 'string';
       });
-      return first?.uri ?? null;
+      return first ?? null;
     };
 
     if (fields) {
       for (const field of fields) {
         if (field.type !== 'image') continue;
-        const uri = findUri(data[field.id]);
-        if (uri) return uri;
+        const photo = findPhoto(data[field.id]);
+        if (photo) return photo;
       }
       return null;
     }
 
-    return findUri(data.photo);
+    return findPhoto(data.photo);
   })();
+
+  const [resolvedThumbnailUri, setResolvedThumbnailUri] = useState<string | null>(
+    resolvePhotoUri ? null : firstPhoto?.uri ?? null
+  );
+
+  useEffect(() => {
+    if (!resolvePhotoUri || !firstPhoto) return;
+    let cancelled = false;
+    resolvePhotoUri(firstPhoto).then((uri) => {
+      if (!cancelled) setResolvedThumbnailUri(uri);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvePhotoUri, firstPhoto]);
+
+  const firstPhotoUri = resolvePhotoUri ? resolvedThumbnailUri : firstPhoto?.uri ?? null;
 
   const hasRating = fields
     ? fields.some((f) => f.type === 'rating' && data[f.id] > 0)
@@ -139,6 +154,10 @@ function EntryCard({ entry, displayNumber, onOpen }: Props) {
         <Text style={styles.preview} numberOfLines={1}>
           {previewTitle ?? `Entry ${displayLabel}`}
         </Text>
+
+        {ownerLabel ? (
+          <Text style={styles.ownerLabel} numberOfLines={1}>{ownerLabel}</Text>
+        ) : null}
 
         {/* Indicators */}
         <View style={styles.indicators}>
@@ -236,6 +255,11 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.text.primary,
+  },
+
+  ownerLabel: {
+    fontSize: 11,
+    color: colors.text.muted,
   },
 
   indicators: {

@@ -49,9 +49,16 @@ export type GpsLocation = {
   address?: string | null;
 };
 
+// `uri` is set for a photo not yet uploaded (a local device file path, or —
+// on native after sync — a rehydrated local file path). Once uploaded, the
+// value stored in Postgres/passed down from admin-fetched data instead has
+// `path` (its Supabase Storage key) with no `uri` at all; utils/photoUrls.ts
+// resolves a displayable URL from that on demand. A given PhotoItem has
+// at least one of the two, never neither.
 export type PhotoItem = {
   id: string;
-  uri: string;
+  uri?: string;
+  path?: string;
 };
 
 // Stored shape for a select option that is the "Other" choice with free text.
@@ -72,6 +79,20 @@ export type Entry = {
   formTitle?: string;
   fields?: FieldDef[];
   data: EntryData;
+
+  // The CustomForm (store/pickerStore.ts) this entry was collected against,
+  // by its local importId — set at creation time so the form's remoteId can
+  // be resolved later even if the form hadn't synced yet when the entry was
+  // created. Only meaningful for locally-created entries; entries pulled
+  // from the server already know formRemoteId directly (see below) and
+  // don't need this.
+  formImportId?: string | null;
+  // The owning form's `forms.id` (Supabase primary key) — entry-photos
+  // Storage objects are keyed by this (not by user) so admin ownership
+  // reassignment never has to move files. Populated once the form has
+  // synced; until then it's resolved on demand from formImportId at push
+  // time (see services/syncEngine.ts's resolveEntryFormId).
+  formRemoteId?: string | null;
 
   userId?: string | null;
   syncStatus: SyncStatus;

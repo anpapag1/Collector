@@ -1,4 +1,5 @@
 import 'react-native-url-polyfill/auto';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
@@ -14,6 +15,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // Web's Google sign-in is a full-page redirect back from Supabase with
+    // the session in the URL fragment — the client needs to pick that up.
+    // Native uses a deep-link callback instead (see authStore.signInWithGoogle),
+    // so this must stay off there or it'll try to parse the app's own URLs.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });

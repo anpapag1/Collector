@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
 import { useFormStore } from '../store/formStore';
 import { useEntriesStore } from '../store/entriesStore';
+import { usePickerStore } from '../store/pickerStore';
 import { captureLocation } from '../utils/sensors';
 import { showDialog } from '../store/dialogStore';
 import { AppColors } from '../theme/colors';
@@ -34,6 +35,10 @@ export default function CollectScreen() {
   const { draft, draftFormId, gpsStatus, setField, setGpsStatus, resetDraft, showErrors, setShowErrors } =
     useFormStore();
   const addEntry = useEntriesStore((s) => s.addEntry);
+  // The active CustomForm's local id (store/pickerStore.ts) — recorded on the
+  // entry so its remoteId (forms.id) can be resolved at sync time even if the
+  // form hasn't synced yet (see resolveEntryFormId in services/syncEngine.ts).
+  const activePresetId = usePickerStore((s) => s.activePresetId);
 
   const [savedFlash, setSavedFlash] = useState(false);
   const [photoSheet, setPhotoSheet] = useState(false);
@@ -154,11 +159,11 @@ export default function CollectScreen() {
       Object.entries(draft).filter(([key]) => visibleIds.has(key)),
     );
 
-    addEntry(filteredDraft, schema.fields, schema.formTitle);
+    addEntry(filteredDraft, schema.fields, schema.formTitle, undefined, activePresetId);
     setSavedFlash(true);
     resetDraft();
     router.replace('/');
-  }, [schema, savedFlash, requiredFields, draft, setShowErrors, showSnack, addEntry, resetDraft]);
+  }, [schema, savedFlash, requiredFields, draft, setShowErrors, showSnack, addEntry, resetDraft, activePresetId]);
 
   const pickImage = useCallback(async (source: 'camera' | 'library') => {
     setPhotoSheet(false);

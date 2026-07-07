@@ -32,13 +32,16 @@ function inFlightEntryIdsSet(): Set<string> {
 // deleted entry's photos can be found and removed from Storage too. Only
 // meaningful once an entry has a userId (i.e. has actually been synced).
 function photoStoragePaths(entry: Entry): string[] {
-  if (!entry.userId) return [];
+  if (!entry.formRemoteId) return [];
   const imageFields = (entry.fields ?? []).filter((f) => f.type === 'image');
   const paths: string[] = [];
   for (const field of imageFields) {
     const photos: PhotoItem[] = entry.data[field.id] ?? [];
     for (const photo of photos) {
-      paths.push(`${entry.userId}/${entry.id}/${photo.id}.jpg`);
+      // Prefer the photo's actual stored object key when known — the fallback
+      // is only for the (rare) case a photo was uploaded but this entry's
+      // local formRemoteId cache is somehow stale.
+      paths.push(photo.path ?? `${entry.formRemoteId}/${entry.id}/${photo.id}.jpg`);
     }
   }
   return paths;
@@ -207,16 +210,32 @@ type EntriesState = {
   pendingDeletions: PendingDeletion[];
   // C2: local_id tombstones for entries deleted mid-first-sync (no remoteId yet).
   pendingLocalIdDeletions: string[];
-  addEntry: (data: EntryData, fields: FieldDef[], formTitle: string, createdAt?: number) => void;
+  addEntry: (
+    data: EntryData,
+    fields: FieldDef[],
+    formTitle: string,
+    createdAt?: number,
+    formImportId?: string | null
+  ) => void;
   updateEntry: (id: string, data: EntryData) => void;
   deleteEntry: (id: string) => void;
   clearEntries: (options?: { deleteRemote?: boolean; formTitle?: string; userId?: string | null }) => void;
   clearLocalOnly: () => void;
+  removeLocalOnly: (ids: string[]) => void;
   markSyncing: (id: string) => void;
   // C1: `pushedUpdatedAt` is the entry's updatedAt captured at push time. If
   // the entry's CURRENT updatedAt no longer matches, the user edited it during
   // the upload, so we must NOT mark it 'synced' (leave it 'pending' to re-upload).
-  markSynced: (id: string, remoteId: string, remoteUpdatedAt: number, pushedUpdatedAt: number) => void;
+  // `formRemoteId` is backfilled here too — it's what resolveEntryFormId
+  // (syncEngine.ts) resolved for this push, cached so future pushes/deletes
+  // don't need to re-resolve it via pickerStore every time.
+  markSynced: (
+    id: string,
+    remoteId: string,
+    remoteUpdatedAt: number,
+    pushedUpdatedAt: number,
+    formRemoteId: string
+  ) => void;
   markSyncError: (id: string, message: string) => void;
   mergeRemoteEntries: (remoteEntries: Entry[]) => void;
   refreshEntryFromRemote: (id: string, fresh: Entry) => void;
@@ -228,7 +247,7 @@ export const useEntriesStore = create<EntriesState>()(
       entries: [],
       pendingDeletions: [],
       pendingLocalIdDeletions: [],
-      addEntry: (data, fields, formTitle, createdAt) => {
+      addEntry: (data, fields, formTitle, createdAt, formImportId) => {
         set((s) => {
           const now = Date.now();
           const entry: Entry = {
@@ -237,6 +256,7 @@ export const useEntriesStore = create<EntriesState>()(
             formTitle,
             fields,
             data,
+            formImportId: formImportId ?? null,
             userId: null,
             syncStatus: 'pending',
             updatedAt: now,
@@ -367,6 +387,15 @@ export const useEntriesStore = create<EntriesState>()(
       // Used when signing out and choosing to keep the cloud copy but wipe
       // this device — never touches Supabase, just clears the local cache.
       clearLocalOnly: () => set({ entries: [] }),
+      // Used by pullRemoteEntries to silently prune local entries that have
+      // been deleted from Supabase (by another device/web).
+      removeLocalOnly: (ids) => {
+        if (ids.length === 0) return;
+        set((s) => {
+          const toRemove = new Set(ids);
+          return { entries: s.entries.filter((e) => !toRemove.has(e.id)) };
+        });
+      },
       markSyncing: (id) => {
         set((s) => ({
           entries: s.entries.map((e) =>
@@ -374,7 +403,7 @@ export const useEntriesStore = create<EntriesState>()(
           ),
         }));
       },
-      markSynced: (id, remoteId, remoteUpdatedAt, pushedUpdatedAt) => {
+      markSynced: (id, remoteId, remoteUpdatedAt, pushedUpdatedAt, formRemoteId) => {
         set((s) => ({
           entries: s.entries.map((e) => {
             if (e.id !== id) return e;
@@ -392,6 +421,7 @@ export const useEntriesStore = create<EntriesState>()(
                 syncingSince: null,
                 remoteId,
                 remoteUpdatedAt,
+                formRemoteId,
                 syncError: null,
               };
             }
@@ -401,6 +431,7 @@ export const useEntriesStore = create<EntriesState>()(
               syncingSince: null,
               remoteId,
               remoteUpdatedAt,
+              formRemoteId,
               syncError: null,
               updatedAt: Date.now(),
             };
@@ -443,6 +474,7 @@ export const useEntriesStore = create<EntriesState>()(
                   data: fresh.data,
                   fields: fresh.fields,
                   formTitle: fresh.formTitle,
+                  formRemoteId: fresh.formRemoteId,
                   remoteUpdatedAt: fresh.remoteUpdatedAt,
                   updatedAt: fresh.updatedAt,
                   syncStatus: 'synced',
