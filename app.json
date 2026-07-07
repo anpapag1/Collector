@@ -22,9 +22,6 @@
       "favicon": "./assets/favicon.png",
       "output": "single"
     },
-    "experiments": {
-      "baseUrl": "/Collector"
-    },
     "plugins": [
       "expo-router",
       "expo-sharing",
