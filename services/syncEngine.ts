@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useEntriesStore, processPendingDeletions } from '../store/entriesStore';
+import { useSyncStore } from '../store/syncStore';
 import { usePickerStore, pushFormToSupabase, CustomForm } from '../store/pickerStore';
 import { Entry, EntryData, FormConfig, PhotoItem } from '../types';
 import { validateFormConfig } from '../utils/schemaLoader';
@@ -13,6 +14,17 @@ import { debugLog } from '../utils/debugLog';
 const PHOTO_UPLOAD_TIMEOUT_MS = 30_000;
 const DB_QUERY_TIMEOUT_MS = 15_000;
 const STALE_SYNCING_MS = 2 * 60_000;
+// entries.updated_at is set client-side (new Date().toISOString(), not a DB
+// trigger/default), so a device with a lagging clock could push a row whose
+// timestamp is behind another device's already-advanced cursor. Subtracting
+// this buffer before every delta query accepts a little harmless re-fetched
+// overlap (the staleness check below already dedupes reapplied rows safely)
+// in exchange for never silently missing a row.
+const SYNC_CURSOR_SKEW_BUFFER_MS = 5 * 60_000;
+// The delta cursor can't see hard deletes (a deleted row has no updated_at to
+// be "newer" than), so an unfiltered id-only reconciliation pass still runs,
+// just infrequently rather than every sync pass.
+const RECONCILE_INTERVAL_MS = 30 * 60_000;
 
 let isRunning = false;
 let queuedRerun = false;
@@ -337,19 +349,24 @@ async function pullRemoteEntries(userId: string): Promise<void> {
   // pending deletion so it isn't re-downloaded before its delete lands.
   const pendingLocalIdSet = new Set(pendingLocalIdDeletions);
 
-  // Lightweight pass first: just enough per row (no `data`/`fields`, which
-  // carry the photo path arrays and dominate row size) to work out which
-  // rows are actually missing or stale locally. Most sync passes touch zero
-  // or a handful of rows, so this avoids re-downloading the full payload for
-  // every entry in the account on every pass.
-  const { data: rows, error } = await withTimeout(
-    supabase
-      .from('entries')
-      .select('id, local_id, updated_at')
-      .eq('user_id', userId),
-    DB_QUERY_TIMEOUT_MS,
-    'Pulling entries timed out'
-  );
+  // Captured before any query runs, so it's safe to use as the next cursor:
+  // any row written while this pass is still in flight will have an
+  // updated_at >= this timestamp and gets picked up next pass rather than
+  // silently skipped.
+  const pullStartedAt = Date.now();
+  const syncCursors = useSyncStore.getState();
+  const cursor = syncCursors.lastSyncedAt[userId];
+
+  // Delta pass: with a stored cursor, only rows changed since the last
+  // successful pull (minus a clock-skew safety buffer) — most passes touch
+  // zero or a handful of rows, so this avoids re-fetching the whole table's
+  // id/local_id/updated_at every time. No cursor yet (first sync ever, or
+  // after a reinstall) falls back to the previous unfiltered behavior.
+  let entriesQuery = supabase.from('entries').select('id, local_id, updated_at').eq('user_id', userId);
+  if (cursor) {
+    entriesQuery = entriesQuery.gt('updated_at', new Date(cursor - SYNC_CURSOR_SKEW_BUFFER_MS).toISOString());
+  }
+  const { data: rows, error } = await withTimeout(entriesQuery, DB_QUERY_TIMEOUT_MS, 'Pulling entries timed out');
   if (error) {
     console.warn('[sync] pull failed', error);
     Sentry.captureException(error);
@@ -358,7 +375,6 @@ async function pullRemoteEntries(userId: string): Promise<void> {
 
   const missingIds: string[] = [];
   const staleIds: string[] = [];
-  const remoteIdSet = new Set((rows ?? []).map((r) => r.id));
 
   for (const row of rows ?? []) {
     if (pendingDeletionIds.has(row.id)) continue;
@@ -375,21 +391,44 @@ async function pullRemoteEntries(userId: string): Promise<void> {
     }
   }
 
-  // Detect and prune local entries that were deleted on the server
-  const deletedLocalIds: string[] = [];
-  for (const local of entries) {
-    if (local.userId === userId && local.remoteId && !remoteIdSet.has(local.remoteId)) {
-      // It was previously synced (has remoteId), but the server no longer returned
-      // it in the full pull for this user. It was deleted by another device/web.
-      deletedLocalIds.push(local.id);
+  // A delta filter can never see hard deletes (a deleted row has no
+  // updated_at to be "newer" than), so detecting entries removed on
+  // another device needs an unfiltered id-only pull — run only occasionally
+  // rather than every pass, since it's the one query here that still scales
+  // with total row count instead of just what changed.
+  const lastReconciledAt = syncCursors.lastReconciledAt[userId] ?? 0;
+  if (pullStartedAt - lastReconciledAt > RECONCILE_INTERVAL_MS) {
+    const { data: idRows, error: idError } = await withTimeout(
+      supabase.from('entries').select('id').eq('user_id', userId),
+      DB_QUERY_TIMEOUT_MS,
+      'Reconciling entries timed out'
+    );
+    if (idError) {
+      console.warn('[sync] reconciliation pull failed', idError);
+      Sentry.captureException(idError);
+    } else {
+      const remoteIdSet = new Set((idRows ?? []).map((r) => r.id));
+      const deletedLocalIds: string[] = [];
+      for (const local of entries) {
+        if (local.userId === userId && local.remoteId && !remoteIdSet.has(local.remoteId)) {
+          // It was previously synced (has remoteId), but the server no longer
+          // returns it for this user. It was deleted by another device/web.
+          deletedLocalIds.push(local.id);
+        }
+      }
+      if (deletedLocalIds.length > 0) {
+        useEntriesStore.getState().removeLocalOnly(deletedLocalIds);
+      }
+      syncCursors.setLastReconciledAt(userId, pullStartedAt);
     }
   }
 
-  if (deletedLocalIds.length > 0) {
-    useEntriesStore.getState().removeLocalOnly(deletedLocalIds);
+  if (missingIds.length === 0 && staleIds.length === 0) {
+    // Nothing needed this pass — safe to advance the cursor all the way up
+    // to when this pass started.
+    syncCursors.setLastSyncedAt(userId, pullStartedAt);
+    return;
   }
-
-  if (missingIds.length === 0 && staleIds.length === 0) return;
 
   // Second pass: fetch the full payload (including `data`/`fields`) only for
   // the rows actually needed, instead of every row in the account.
@@ -417,26 +456,47 @@ async function pullRemoteEntries(userId: string): Promise<void> {
     Promise.allSettled(stale.map((row) => downloadRemoteEntry(row, userId))),
   ]);
 
+  // Tracks whether every row in this batch ended up fully up to date, so the
+  // cursor below only advances when it's actually safe to. A rejected
+  // promise is the obvious case; the less obvious one is downloadRemoteEntry
+  // resolving "successfully" but with one or more photos still missing — it
+  // deliberately reports remoteUpdatedAt one tick behind the server's real
+  // value in that case (see its own comment) specifically so the row keeps
+  // looking stale. That trick only works if the cursor never advances past
+  // it either, or the row would eventually age out of the delta filter's
+  // buffer window and stop being retried at all.
+  let anyIncomplete = false;
+
   const downloaded: Entry[] = [];
-  for (const result of missingResults) {
+  for (let i = 0; i < missingResults.length; i++) {
+    const result = missingResults[i];
     if (result.status === 'fulfilled') {
       downloaded.push(result.value);
+      if (result.value.remoteUpdatedAt !== new Date(missing[i].updated_at).getTime()) anyIncomplete = true;
     } else {
       console.warn('[sync] failed to pull one entry, will retry next pass', result.reason);
       Sentry.captureException(result.reason);
+      anyIncomplete = true;
     }
   }
   if (downloaded.length > 0) {
     useEntriesStore.getState().mergeRemoteEntries(downloaded);
   }
 
-  for (const result of staleResults) {
+  for (let i = 0; i < staleResults.length; i++) {
+    const result = staleResults[i];
     if (result.status === 'fulfilled') {
       useEntriesStore.getState().refreshEntryFromRemote(result.value.id, result.value);
+      if (result.value.remoteUpdatedAt !== new Date(stale[i].updated_at).getTime()) anyIncomplete = true;
     } else {
       console.warn('[sync] failed to refresh one entry, will retry next pass', result.reason);
       Sentry.captureException(result.reason);
+      anyIncomplete = true;
     }
+  }
+
+  if (!anyIncomplete) {
+    syncCursors.setLastSyncedAt(userId, pullStartedAt);
   }
 }
 
@@ -521,6 +581,16 @@ async function downloadOnePhoto(photo: { id: string; path: string }): Promise<Ph
 
   const dest = (FileSystem.documentDirectory ?? '') + `${photo.id}.jpg`;
 
+  // photo.id is never reused for different content (see collect.tsx), so a
+  // file already sitting at this deterministic path is guaranteed to be this
+  // exact photo — no need to re-download it, whether this is a fresh
+  // sign-in re-syncing the whole photo history or a later pass re-visiting
+  // an entry that's "stale" for an unrelated field.
+  const existing = await FileSystem.getInfoAsync(dest);
+  if (existing.exists) {
+    return { id: photo.id, uri: dest };
+  }
+
   const { data, error } = await supabase.storage
     .from('entry-photos')
     .createSignedUrl(photo.path, 60);
@@ -528,11 +598,16 @@ async function downloadOnePhoto(photo: { id: string; path: string }): Promise<Ph
     throw error ?? new Error(`Could not get signed URL for photo ${photo.id}`);
   }
 
+  // Download to a temp path and move into place only on success, so an app
+  // kill mid-download can't leave a partial file at `dest` that the check
+  // above would then treat as complete forever.
+  const tmpDest = `${dest}.tmp`;
   await withTimeout(
-    FileSystem.downloadAsync(data.signedUrl, dest),
+    FileSystem.downloadAsync(data.signedUrl, tmpDest),
     PHOTO_UPLOAD_TIMEOUT_MS,
     `Downloading photo ${photo.id} timed out`
   );
+  await FileSystem.moveAsync({ from: tmpDest, to: dest });
 
   return { id: photo.id, uri: dest };
 }
@@ -543,8 +618,14 @@ async function downloadOnePhoto(photo: { id: string; path: string }): Promise<Ph
 // different owner via the admin dashboard (which directly updates
 // forms.user_id). Both look identical to us under RLS: no owned row exists.
 async function pullRemoteForms(userId: string): Promise<void> {
+  // Reconciling ownership (missing/reassigned/deleted forms) needs every
+  // owned row's id/form_id/version every pass — that set doesn't fit a
+  // simple updated_at cursor the way entries does. What dominates row size
+  // is `schema` (the full form definition), which is only actually needed
+  // for forms this device doesn't have yet — so leave that out here and
+  // fetch it separately, only for the ones found missing below.
   const { data: rows, error } = await withTimeout(
-    supabase.from('forms').select('id, form_id, version, schema').eq('user_id', userId),
+    supabase.from('forms').select('id, form_id, version').eq('user_id', userId),
     DB_QUERY_TIMEOUT_MS,
     'Pulling forms timed out'
   );
@@ -611,14 +692,27 @@ async function pullRemoteForms(userId: string): Promise<void> {
 
   if (missing.length === 0) return;
 
+  const { data: schemaRows, error: schemaError } = await withTimeout(
+    supabase.from('forms').select('id, schema').in('id', missing.map((row) => row.id)),
+    DB_QUERY_TIMEOUT_MS,
+    'Pulling form schemas timed out'
+  );
+  if (schemaError) {
+    console.warn('[sync] form schemas pull failed', schemaError);
+    Sentry.captureException(schemaError);
+    return;
+  }
+  const schemaById = new Map((schemaRows ?? []).map((row) => [row.id, row.schema]));
+
   // A row's `schema` jsonb is trusted at push time (it came from a locally
   // validated import), but another device, a manual DB edit, or future
   // schema drift could still land something malformed here — re-validate
   // before it's allowed into this device's picker rather than trusting it.
   const valid: CustomForm[] = [];
   for (const row of missing) {
+    const schema = schemaById.get(row.id);
     try {
-      const config = validateFormConfig(row.schema);
+      const config = validateFormConfig(schema);
       // Record the remote PK so this device can match/update the exact row and
       // survive a future ownership change without re-pushing a duplicate.
       valid.push({ importId: row.id, config, userId, remoteId: row.id });

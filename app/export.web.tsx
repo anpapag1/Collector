@@ -6,7 +6,8 @@ import { useEntriesStore } from '../store/entriesStore';
 import { usePickerStore } from '../store/pickerStore';
 import { buildCsvString, buildXlsxWorkbookBase64, xlsxExportFilename, buildZipBase64, exportFilename } from '../utils/exporter';
 import { resolveEntryPhotoUrl } from '../utils/photoUrls';
-import { fetchAllForms, fetchAllEntries, AdminForm } from '../services/adminService';
+import { AdminForm } from '../services/adminService';
+import { useAdminStore } from '../store/adminStore';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import { AppColors } from '../theme/colors';
 import DashboardNav from '../components/dashboard/DashboardNav';
@@ -47,10 +48,13 @@ export default function DashboardExport() {
   const [adminEntries, setAdminEntries] = useState<Entry[]>([]);
   const [loadingAdmin, setLoadingAdmin] = useState(dataMode === 'admin');
 
+  const loadForms = useAdminStore((s) => s.loadForms);
+  const loadEntries = useAdminStore((s) => s.loadEntries);
+
   useEffect(() => {
     if (dataMode !== 'admin') return;
     setLoadingAdmin(true);
-    Promise.all([fetchAllForms(ownerIdParam), fetchAllEntries(ownerIdParam)])
+    Promise.all([loadForms(ownerIdParam), loadEntries(ownerIdParam)])
       .then(([forms, entries]) => {
         setAdminForms(forms);
         setAdminEntries(
@@ -71,7 +75,7 @@ export default function DashboardExport() {
       })
       .catch((e) => console.warn('[export] failed to load admin data', e))
       .finally(() => setLoadingAdmin(false));
-  }, [dataMode, ownerIdParam]);
+  }, [dataMode, ownerIdParam, loadForms, loadEntries]);
 
   const availableForms = useMemo(() => {
     if (dataMode === 'admin') {

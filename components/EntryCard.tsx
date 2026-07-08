@@ -7,6 +7,7 @@ import { previewTitleForEntry } from '../utils/entryPreview';
 import { AppColors } from '../theme/colors';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import { useAuthStore } from '../store/authStore';
+import { useAppSettingsStore } from '../store/appSettingsStore';
 import { showDialog } from '../store/dialogStore';
 
 type Props = {
@@ -82,12 +83,18 @@ function EntryCard({ entry, displayNumber, onOpen, resolvePhotoUri, ownerLabel }
     return findPhoto(data.photo);
   })();
 
+  // Network-wide toggle (app/settings.web.tsx, admin-only) — off means no
+  // entry card anywhere fetches or shows a photo thumbnail, not just this
+  // one hidden visually. Checked before resolvePhotoUri is ever called so
+  // the signed-URL/Storage request itself is skipped, not just its result.
+  const showEntryPreviews = useAppSettingsStore((s) => s.showEntryPreviews);
+
   const [resolvedThumbnailUri, setResolvedThumbnailUri] = useState<string | null>(
     resolvePhotoUri ? null : firstPhoto?.uri ?? null
   );
 
   useEffect(() => {
-    if (!resolvePhotoUri || !firstPhoto) return;
+    if (!showEntryPreviews || !resolvePhotoUri || !firstPhoto) return;
     let cancelled = false;
     resolvePhotoUri(firstPhoto).then((uri) => {
       if (!cancelled) setResolvedThumbnailUri(uri);
@@ -95,9 +102,13 @@ function EntryCard({ entry, displayNumber, onOpen, resolvePhotoUri, ownerLabel }
     return () => {
       cancelled = true;
     };
-  }, [resolvePhotoUri, firstPhoto]);
+  }, [showEntryPreviews, resolvePhotoUri, firstPhoto]);
 
-  const firstPhotoUri = resolvePhotoUri ? resolvedThumbnailUri : firstPhoto?.uri ?? null;
+  const firstPhotoUri = !showEntryPreviews
+    ? null
+    : resolvePhotoUri
+    ? resolvedThumbnailUri
+    : firstPhoto?.uri ?? null;
 
   const hasRating = fields
     ? fields.some((f) => f.type === 'rating' && data[f.id] > 0)

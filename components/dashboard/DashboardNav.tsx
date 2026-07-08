@@ -65,6 +65,16 @@ export default function DashboardNav() {
                 </TouchableOpacity>
               );
             })}
+            {isAdmin && (
+              <TouchableOpacity
+                style={[styles.tab, pathname === '/settings' && styles.tabActive]}
+                onPress={() => router.push('/settings')}
+              >
+                <Text style={[styles.tabLabel, pathname === '/settings' && styles.tabLabelActive]}>
+                  Settings
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
         <View style={[styles.right, isCompact && styles.rightCompact]}>

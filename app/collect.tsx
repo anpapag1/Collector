@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
 import { useFormStore } from '../store/formStore';
 import { useEntriesStore } from '../store/entriesStore';
@@ -173,17 +174,34 @@ export default function CollectScreen() {
       return;
     }
     try {
-      // TODO: True dimension downscaling (e.g. cap longest side at 1600px)
-      // needs expo-image-manipulator, which is not a dependency. Until then we
-      // lower the encode quality to keep stored originals smaller. quality only
-      // re-encodes — it does not reduce pixel dimensions.
       const result =
         source === 'camera'
           ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
           : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
       if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
         const id = `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const picked = new File(result.assets[0].uri);
+        let sourceUri = asset.uri;
+
+        // quality above only re-encodes — it doesn't reduce pixel dimensions,
+        // so full camera-resolution photos still upload/download/export at
+        // full size. Cap the longest edge; this is generous headroom over
+        // every place a photo is actually rendered (EntryCard's 52x52pt
+        // thumbnail, the exporter's 112x76pt embed).
+        const MAX_DIMENSION = 1600;
+        if (asset.width && asset.height && Math.max(asset.width, asset.height) > MAX_DIMENSION) {
+          const scale = MAX_DIMENSION / Math.max(asset.width, asset.height);
+          const resized = await ImageManipulator.manipulate(asset.uri)
+            .resize({ width: Math.round(asset.width * scale), height: Math.round(asset.height * scale) })
+            .renderAsync();
+          const saved = await resized.saveAsync({
+            compress: 0.6,
+            format: SaveFormat.JPEG,
+          });
+          sourceUri = saved.uri;
+        }
+
+        const picked = new File(sourceUri);
         const dest = new File(Paths.document, `${id}.jpg`);
         picked.copySync(dest);
         const newPhoto: PhotoItem = { id, uri: dest.uri };
