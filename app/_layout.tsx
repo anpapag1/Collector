@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
-import { Stack } from 'expo-router';
+import { Platform, StyleSheet } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -96,6 +96,19 @@ function RootLayout() {
         useFormStore.setState({ hasInitialized: true });
       }
       SplashScreen.hideAsync();
+
+      // GitHub Pages SPA redirect: 404.html stores the intended path
+      // in sessionStorage before redirecting to "/". Pick it up here
+      // and navigate so that page refreshes on deep links work.
+      if (Platform.OS === 'web') {
+        try {
+          const redirect = sessionStorage.getItem('spa-redirect');
+          if (redirect && redirect !== '/') {
+            sessionStorage.removeItem('spa-redirect');
+            router.replace(redirect as any);
+          }
+        } catch {}
+      }
     }
   }, [fontsLoaded, hasHydrated, hasInitialized]);
 
