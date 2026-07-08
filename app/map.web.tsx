@@ -7,7 +7,7 @@ import { usePickerStore } from '../store/pickerStore';
 import { entryLocation, googleMapsUrl } from '../utils/mapHelpers';
 import { getEntryDisplayNumbers } from '../utils/entryNumbering';
 import { previewTitleForEntry } from '../utils/entryPreview';
-import { fetchAllEntries } from '../services/adminService';
+import { useAdminStore } from '../store/adminStore';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
 import { AppColors } from '../theme/colors';
 import DashboardNav from '../components/dashboard/DashboardNav';
@@ -36,10 +36,12 @@ export default function DashboardMapScreen() {
   const [adminEntries, setAdminEntries] = useState<Entry[]>([]);
   const [loadingAdmin, setLoadingAdmin] = useState(dataMode === 'admin');
 
+  const loadEntries = useAdminStore((s) => s.loadEntries);
+
   const reloadAdminEntries = useCallback(() => {
     if (dataMode !== 'admin') return;
     setLoadingAdmin(true);
-    fetchAllEntries(ownerIdParam)
+    loadEntries(ownerIdParam)
       .then((entries) =>
         setAdminEntries(
           entries.map((e) => ({
@@ -57,7 +59,7 @@ export default function DashboardMapScreen() {
       )
       .catch((e) => console.warn('[map] failed to load admin entries', e))
       .finally(() => setLoadingAdmin(false));
-  }, [dataMode, ownerIdParam]);
+  }, [dataMode, ownerIdParam, loadEntries]);
 
   useEffect(() => {
     reloadAdminEntries();

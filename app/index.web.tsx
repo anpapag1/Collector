@@ -7,7 +7,8 @@ import { showDialog } from '../store/dialogStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { usePickerStore, CustomForm } from '../store/pickerStore';
 import { useFormDraftStore } from '../store/formDraftStore';
-import { fetchAllForms, fetchAllEntries, deleteFormAdmin, switchFormOwner, AdminForm } from '../services/adminService';
+import { fetchEntryFormTitles, deleteFormAdmin, switchFormOwner, AdminForm } from '../services/adminService';
+import { useAdminStore } from '../store/adminStore';
 import { FormConfig } from '../types';
 import { FORM_TEMPLATES } from '../utils/formTemplates';
 import { useAppColors, useThemedStyles } from '../theme/useAppColors';
@@ -70,22 +71,23 @@ export default function DashboardHome() {
   const [switchOwnerTarget, setSwitchOwnerTarget] = useState<DisplayForm | null>(null);
   const [optionsOpenId, setOptionsOpenId] = useState<string | null>(null);
 
+  const loadForms = useAdminStore((s) => s.loadForms);
+
   const reloadAdminData = useCallback(() => {
     if (dataMode !== 'admin') return;
     setLoadingAdmin(true);
-    Promise.all([fetchAllForms(ownerIdParam), fetchAllEntries(ownerIdParam)])
-      .then(([forms, entries]) => {
+    Promise.all([loadForms(ownerIdParam), fetchEntryFormTitles(ownerIdParam)])
+      .then(([forms, formTitles]) => {
         setAdminForms(forms);
         const counts = new Map<string, number>();
-        for (const entry of entries) {
-          if (!entry.formTitle) continue;
-          counts.set(entry.formTitle, (counts.get(entry.formTitle) ?? 0) + 1);
+        for (const formTitle of formTitles) {
+          counts.set(formTitle, (counts.get(formTitle) ?? 0) + 1);
         }
         setAdminEntryCounts(counts);
       })
       .catch((e) => console.warn('[dashboard] failed to load admin forms/entries', e))
       .finally(() => setLoadingAdmin(false));
-  }, [dataMode, ownerIdParam]);
+  }, [dataMode, ownerIdParam, loadForms]);
 
   useEffect(() => {
     reloadAdminData();
@@ -172,7 +174,10 @@ export default function DashboardHome() {
               clearEntries({ formTitle: form.config.formTitle, userId });
             } else if (form.admin) {
               deleteFormAdmin({ dbId: form.admin.dbId })
-                .then(reloadAdminData)
+                .then(() => {
+                  useAdminStore.getState().invalidateAdminData();
+                  reloadAdminData();
+                })
                 .catch((e) => console.warn('[dashboard] failed to delete form', e));
             }
           },
@@ -186,7 +191,10 @@ export default function DashboardHome() {
     setSwitchOwnerTarget(null);
     if (!form?.admin) return;
     switchFormOwner({ dbId: form.admin.dbId }, newOwnerId)
-      .then(reloadAdminData)
+      .then(() => {
+        useAdminStore.getState().invalidateAdminData();
+        reloadAdminData();
+      })
       .catch((e) => console.warn('[dashboard] failed to switch owner', e));
   };
 

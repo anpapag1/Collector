@@ -18,6 +18,7 @@ import { usePickerStore } from '../store/pickerStore';
 import { useEntriesStore } from '../store/entriesStore';
 import { useAuthStore } from '../store/authStore';
 import { useSyncStore } from '../store/syncStore';
+import { useAppSettingsStore } from '../store/appSettingsStore';
 import { useThemeStore } from '../store/themeStore';
 import { useOnboardingStore } from '../store/onboardingStore';
 import DialogHost from '../components/DialogHost';
@@ -38,12 +39,14 @@ function RootLayout() {
   const hasInitialized = useFormStore((s) => s.hasInitialized);
   const initAuth = useAuthStore((s) => s.init);
   const initSync = useSyncStore((s) => s.init);
+  const initAppSettings = useAppSettingsStore((s) => s.init);
   const themeMode = useThemeStore((s) => s.mode);
 
   useEffect(() => {
     initAuth();
     initSync();
-  }, [initAuth, initSync]);
+    initAppSettings();
+  }, [initAuth, initSync, initAppSettings]);
 
   const [fontsLoaded] = useFonts({
     Roboto_400Regular,

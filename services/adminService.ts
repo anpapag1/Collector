@@ -77,6 +77,18 @@ export async function fetchAllForms(ownerId?: string): Promise<AdminForm[]> {
   }));
 }
 
+// Lightweight companion to fetchAllEntries for callers that only need a
+// per-form entry count (e.g. the dashboard home screen) — skips the `data`
+// jsonb column, which holds every field value plus photo path arrays and can
+// be sizeable per row.
+export async function fetchEntryFormTitles(ownerId?: string): Promise<string[]> {
+  let query = supabase.from('entries').select('form_title');
+  if (ownerId) query = query.eq('user_id', ownerId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((row) => row.form_title).filter((t): t is string => !!t);
+}
+
 export async function fetchAllEntries(ownerId?: string): Promise<AdminEntry[]> {
   let query = supabase
     .from('entries')

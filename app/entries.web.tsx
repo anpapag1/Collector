@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,7 +10,8 @@ import { AppColors } from '../theme/colors';
 import { getEntryDisplayNumbers } from '../utils/entryNumbering';
 import { selectValueLabel } from '../utils/formLogic';
 import { resolveEntryPhotoUrl } from '../utils/photoUrls';
-import { fetchAllForms, fetchAllEntries, updateEntryData, deleteEntryAdmin, AdminEntry } from '../services/adminService';
+import { updateEntryData, deleteEntryAdmin, AdminEntry } from '../services/adminService';
+import { useAdminStore } from '../store/adminStore';
 import DashboardNav from '../components/dashboard/DashboardNav';
 import EntryCard from '../components/EntryCard';
 import EntryDetailFields from '../components/dashboard/EntryDetailFields';
@@ -59,10 +60,13 @@ export default function DashboardEntries() {
   const [adminEntries, setAdminEntries] = useState<Entry[]>([]);
   const [loadingAdmin, setLoadingAdmin] = useState(isAdminSource);
 
+  const loadForms = useAdminStore((s) => s.loadForms);
+  const loadEntries = useAdminStore((s) => s.loadEntries);
+
   const reloadAdminEntries = useCallback(() => {
     if (!isAdminSource || !formId) return;
     setLoadingAdmin(true);
-    Promise.all([fetchAllForms(owner), fetchAllEntries(owner)])
+    Promise.all([loadForms(owner), loadEntries(owner)])
       .then(([forms, entries]) => {
         const form = forms.find((f) => f.dbId === formId);
         setAdminFormTitle(form?.formTitle ?? null);
@@ -73,7 +77,7 @@ export default function DashboardEntries() {
       })
       .catch((e) => console.warn('[entries] failed to load admin entries', e))
       .finally(() => setLoadingAdmin(false));
-  }, [isAdminSource, formId, owner]);
+  }, [isAdminSource, formId, owner, loadForms, loadEntries]);
 
   useEffect(() => {
     reloadAdminEntries();
@@ -128,13 +132,24 @@ export default function DashboardEntries() {
     [selectedEntry],
   );
 
-  const entryCardResolvePhotoUri = useCallback(
-    (entry: Entry) => (photo: PhotoItem) => {
-      if (!entry.formRemoteId) return Promise.resolve(null);
-      return resolveEntryPhotoUrl(photo, entry.formRemoteId, entry.id);
-    },
-    [],
-  );
+  // One resolver closure per entry id, cached for the component's lifetime —
+  // calling entryCardResolvePhotoUri(entry) inline in JSX would otherwise
+  // create a brand-new closure every render (e.g. every keystroke in the
+  // search box), which defeats resolveEntryPhotoUrl's own cache by giving
+  // EntryCard's effect a new prop identity to re-fire on each time.
+  const resolverCacheRef = useRef(new Map<string, (photo: PhotoItem) => Promise<string | null>>());
+  const entryCardResolvePhotoUri = useCallback((entry: Entry) => {
+    const cache = resolverCacheRef.current;
+    let resolver = cache.get(entry.id);
+    if (!resolver) {
+      resolver = (photo: PhotoItem) => {
+        if (!entry.formRemoteId) return Promise.resolve(null);
+        return resolveEntryPhotoUrl(photo, entry.formRemoteId, entry.id);
+      };
+      cache.set(entry.id, resolver);
+    }
+    return resolver;
+  }, []);
 
   const handleDelete = (entry: Entry) => {
     const num = displayNumbers.get(entry.id) ?? 0;
@@ -151,7 +166,10 @@ export default function DashboardEntries() {
             if (isAdminSource) {
               if (!entry.remoteId) return;
               deleteEntryAdmin(entry.remoteId)
-                .then(reloadAdminEntries)
+                .then(() => {
+                  useAdminStore.getState().invalidateAdminData();
+                  reloadAdminEntries();
+                })
                 .catch((e) => console.warn('[entries] failed to delete admin entry', e));
             } else {
               deleteEntry(entry.id);
@@ -179,6 +197,7 @@ export default function DashboardEntries() {
     }
     updateEntryData(selectedEntry.remoteId, parsed)
       .then(() => {
+        useAdminStore.getState().invalidateAdminData();
         setEditingJson(null);
         reloadAdminEntries();
       })
