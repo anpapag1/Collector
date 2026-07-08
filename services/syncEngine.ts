@@ -5,7 +5,7 @@ import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useEntriesStore, processPendingDeletions } from '../store/entriesStore';
-import { useSyncStore } from '../store/syncStore';
+import { useSyncCursorStore } from '../store/syncCursorStore';
 import { usePickerStore, pushFormToSupabase, CustomForm } from '../store/pickerStore';
 import { Entry, EntryData, FormConfig, PhotoItem } from '../types';
 import { validateFormConfig } from '../utils/schemaLoader';
@@ -354,7 +354,7 @@ async function pullRemoteEntries(userId: string): Promise<void> {
   // updated_at >= this timestamp and gets picked up next pass rather than
   // silently skipped.
   const pullStartedAt = Date.now();
-  const syncCursors = useSyncStore.getState();
+  const syncCursors = useSyncCursorStore.getState();
   const cursor = syncCursors.lastSyncedAt[userId];
 
   // Delta pass: with a stored cursor, only rows changed since the last
