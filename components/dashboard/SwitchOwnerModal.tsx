@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Profile } from '../../services/adminService';
 import { useAppColors, useThemedStyles } from '../../theme/useAppColors';
 import { AppColors } from '../../theme/colors';
+import { blurActiveElement } from '../../utils/webA11y';
 
 // Admin-only "Switch owner" picker — mirrors Collector-Web's
 // openSwitchOwnerModal/renderSwitchOwnerList (dashboard.js:439-473). No
@@ -34,13 +35,26 @@ export default function SwitchOwnerModal({
     return q ? others.filter((p) => p.email.toLowerCase().includes(q)) : others;
   }, [profiles, currentOwnerId, query]);
 
+  // The search input is autoFocus, so it's very often still focused right
+  // when this modal closes — blur it first, or react-native-web's Modal
+  // marking its now-hidden container aria-hidden while focus is still
+  // inside triggers a browser accessibility warning.
+  const handleClose = () => {
+    blurActiveElement();
+    onClose();
+  };
+  const handleSelect = (userId: string) => {
+    blurActiveElement();
+    onSelect(userId);
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <View style={styles.scrim}>
         <View style={styles.card}>
           <View style={styles.header}>
             <Text style={styles.title} numberOfLines={1}>Move "{formTitle}"</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity onPress={handleClose}>
               <MaterialIcons name="close" size={20} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
@@ -59,7 +73,7 @@ export default function SwitchOwnerModal({
               </Text>
             ) : (
               candidates.map((p) => (
-                <TouchableOpacity key={p.id} style={styles.option} onPress={() => onSelect(p.id)}>
+                <TouchableOpacity key={p.id} style={styles.option} onPress={() => handleSelect(p.id)}>
                   <Text style={styles.optionLabel}>{p.email}</Text>
                 </TouchableOpacity>
               ))

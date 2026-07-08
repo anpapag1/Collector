@@ -10,6 +10,7 @@ import { AppColors } from '../theme/colors';
 import { getEntryDisplayNumbers } from '../utils/entryNumbering';
 import { selectValueLabel } from '../utils/formLogic';
 import { resolveEntryPhotoUrl } from '../utils/photoUrls';
+import { blurActiveElement } from '../utils/webA11y';
 import { updateEntryData, deleteEntryAdmin, AdminEntry } from '../services/adminService';
 import { useAdminStore } from '../store/adminStore';
 import DashboardNav from '../components/dashboard/DashboardNav';
@@ -124,6 +125,19 @@ export default function DashboardEntries() {
   const [editingJson, setEditingJson] = useState<string | null>(null);
   const [jsonError, setJsonError] = useState<string | null>(null);
 
+  // Blur before hiding — react-native-web's <Modal> marks its container
+  // aria-hidden as soon as `visible` flips false, and the browser blocks
+  // that (with a console warning) if a TextInput inside (the JSON editor)
+  // still has focus at that instant.
+  const closeEntryModal = useCallback(() => {
+    blurActiveElement();
+    setSelectedId(null);
+  }, []);
+  const closeJsonModal = useCallback(() => {
+    blurActiveElement();
+    setEditingJson(null);
+  }, []);
+
   const resolvePhotoUri = useCallback(
     (photo: PhotoItem) => {
       if (!selectedEntry?.formRemoteId) return Promise.resolve(null);
@@ -162,7 +176,7 @@ export default function DashboardEntries() {
           label: 'Delete',
           style: 'destructive',
           onPress: () => {
-            if (selectedId === entry.id) setSelectedId(null);
+            if (selectedId === entry.id) closeEntryModal();
             if (isAdminSource) {
               if (!entry.remoteId) return;
               deleteEntryAdmin(entry.remoteId)
@@ -198,7 +212,7 @@ export default function DashboardEntries() {
     updateEntryData(selectedEntry.remoteId, parsed)
       .then(() => {
         useAdminStore.getState().invalidateAdminData();
-        setEditingJson(null);
+        closeJsonModal();
         reloadAdminEntries();
       })
       .catch((e) => setJsonError(e?.message ?? 'Could not save.'));
@@ -279,7 +293,7 @@ export default function DashboardEntries() {
         )}
       </ScrollView>
 
-      <Modal visible={!!selectedEntry} transparent animationType="fade" onRequestClose={() => setSelectedId(null)}>
+      <Modal visible={!!selectedEntry} transparent animationType="fade" onRequestClose={closeEntryModal}>
         <View style={styles.modalScrim}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
@@ -292,7 +306,7 @@ export default function DashboardEntries() {
                     <Text style={styles.editJsonBtnLabel}>Edit JSON</Text>
                   </TouchableOpacity>
                 ) : null}
-                <TouchableOpacity onPress={() => setSelectedId(null)}>
+                <TouchableOpacity onPress={closeEntryModal}>
                   <MaterialIcons name="close" size={22} color={colors.text.secondary} />
                 </TouchableOpacity>
               </View>
@@ -310,12 +324,12 @@ export default function DashboardEntries() {
         </View>
       </Modal>
 
-      <Modal visible={editingJson != null} transparent animationType="fade" onRequestClose={() => setEditingJson(null)}>
+      <Modal visible={editingJson != null} transparent animationType="fade" onRequestClose={closeJsonModal}>
         <View style={styles.modalScrim}>
           <View style={styles.jsonModalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit entry JSON</Text>
-              <TouchableOpacity onPress={() => setEditingJson(null)}>
+              <TouchableOpacity onPress={closeJsonModal}>
                 <MaterialIcons name="close" size={22} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
