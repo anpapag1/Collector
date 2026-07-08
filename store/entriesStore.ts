@@ -166,15 +166,6 @@ export async function processPendingDeletions(): Promise<void> {
   }
 }
 
-// Allows a UI layer (e.g. app/_layout.tsx) to register a callback that gets
-// notified when a persistence write/read/remove fails, so failures can be
-// surfaced to the user (e.g. via a toast) instead of only logged.
-let onPersistError: ((msg: string) => void) | null = null;
-
-export function setPersistErrorHandler(fn: typeof onPersistError) {
-  onPersistError = fn;
-}
-
 // Wraps AsyncStorage so persist read/write/remove failures are logged instead
 // of silently swallowed or thrown deep inside zustand's persist middleware.
 export const safeAsyncStorage: StateStorage = {
@@ -183,7 +174,6 @@ export const safeAsyncStorage: StateStorage = {
       return await AsyncStorage.getItem(name);
     } catch (err) {
       console.warn(`[storage] getItem failed for "${name}"`, err);
-      onPersistError?.('Failed to load entries from device storage');
       return null;
     }
   },
@@ -192,7 +182,6 @@ export const safeAsyncStorage: StateStorage = {
       await AsyncStorage.setItem(name, value);
     } catch (err) {
       console.warn(`[storage] setItem failed for "${name}"`, err);
-      onPersistError?.('Failed to save entries to device storage');
     }
   },
   removeItem: async (name) => {
@@ -200,7 +189,6 @@ export const safeAsyncStorage: StateStorage = {
       await AsyncStorage.removeItem(name);
     } catch (err) {
       console.warn(`[storage] removeItem failed for "${name}"`, err);
-      onPersistError?.('Failed to remove entries from device storage');
     }
   },
 };

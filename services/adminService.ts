@@ -55,11 +55,6 @@ export async function loadAllProfiles(): Promise<Profile[]> {
   return data ?? [];
 }
 
-export function profileLabel(profiles: Profile[], userId: string | null | undefined): string {
-  if (!userId) return 'Unclaimed';
-  return profiles.find((p) => p.id === userId)?.email ?? userId;
-}
-
 // `ownerId` omitted fetches every user's rows (admin "All users" view); RLS
 // scopes this to admin-only regardless of what the client asks for.
 export async function fetchAllForms(ownerId?: string): Promise<AdminForm[]> {
